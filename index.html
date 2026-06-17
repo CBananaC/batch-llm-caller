@@ -57,15 +57,23 @@
       font-weight: 650;
     }
 
+    .help-text {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
     textarea,
     input[type="text"],
+    input[type="password"],
     input[type="file"] {
       width: 100%;
       font: inherit;
     }
 
     textarea,
-    input[type="text"] {
+    input[type="text"],
+    input[type="password"] {
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 11px 12px;
@@ -204,8 +212,26 @@
     </div>
 
     <div class="field">
+      <label for="apiUrl">API URL</label>
+      <input id="apiUrl" type="text" value="http://127.0.0.1:1234/v1/chat/completions">
+    </div>
+
+    <div class="field">
+      <label for="apiKey">API Key</label>
+      <input id="apiKey" type="password" value="">
+    </div>
+
+    <div class="field">
       <label for="modelName">Model name</label>
-      <input id="modelName" type="text" value="qwen3.5-0.8b-mlx:3">
+      <input
+        id="modelName"
+        type="text"
+        value="qwen3.5-0.8b-mlx:3"
+        placeholder="qwen3.5-0.8b-mlx:3, gemini-2.5-flash, meta-llama/llama-3.3-70b-instruct:free"
+      >
+      <p class="help-text">
+        Examples: qwen3.5-0.8b-mlx:3 for LM Studio; gemini-2.5-flash for Google AI Studio; meta-llama/llama-3.3-70b-instruct:free for OpenRouter.
+      </p>
     </div>
 
     <div class="actions">
@@ -230,10 +256,10 @@
   </main>
 
   <script>
-    const API_URL = "http://127.0.0.1:1234/v1/chat/completions";
-
     const systemPromptEl = document.getElementById("systemPrompt");
     const promptFileEl = document.getElementById("promptFile");
+    const apiUrlEl = document.getElementById("apiUrl");
+    const apiKeyEl = document.getElementById("apiKey");
     const modelNameEl = document.getElementById("modelName");
     const runBtn = document.getElementById("runBtn");
     const downloadBtn = document.getElementById("downloadBtn");
@@ -277,12 +303,18 @@
       resultsBody.appendChild(tr);
     }
 
-    async function callModel(systemPrompt, userPrompt, modelName) {
-      const response = await fetch(API_URL, {
+    async function callModel(apiUrl, apiKey, systemPrompt, userPrompt, modelName) {
+      const headers = {
+        "Content-Type": "application/json"
+      };
+
+      if (apiKey) {
+        headers.Authorization = `Bearer ${apiKey}`;
+      }
+
+      const response = await fetch(apiUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers,
         body: JSON.stringify({
           model: modelName,
           temperature: 0,
@@ -347,11 +379,18 @@
 
     async function runBatch() {
       const file = promptFileEl.files[0];
+      const apiUrl = apiUrlEl.value.trim();
+      const apiKey = apiKeyEl.value.trim();
       const modelName = modelNameEl.value.trim();
       const systemPrompt = systemPromptEl.value;
 
       if (!file) {
         setStatus("Choose a .txt or .csv file first.", true);
+        return;
+      }
+
+      if (!apiUrl) {
+        setStatus("Enter an API URL first.", true);
         return;
       }
 
@@ -381,7 +420,7 @@
           setStatus(`Processing ${i + 1} / ${lines.length}`);
 
           try {
-            modelResponse = await callModel(systemPrompt, input, modelName);
+            modelResponse = await callModel(apiUrl, apiKey, systemPrompt, input, modelName);
           } catch (error) {
             modelResponse = `Error: ${error.message || String(error)}`;
           }
