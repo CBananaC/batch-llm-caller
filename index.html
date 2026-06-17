@@ -47,6 +47,14 @@
       line-height: 1.2;
     }
 
+    h2 {
+      margin: 28px 0 16px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      font-size: 1.25rem;
+      line-height: 1.25;
+    }
+
     .field {
       margin-bottom: 18px;
     }
@@ -239,6 +247,23 @@
       <button id="downloadBtn" type="button">Download CSV</button>
     </div>
 
+    <h2>Image OCR input</h2>
+
+    <div class="field">
+      <label for="imageFile">Image file (.png, .jpg, .jpeg, .webp)</label>
+      <input id="imageFile" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp">
+    </div>
+
+    <div class="actions">
+      <button id="extractOcrBtn" type="button">Extract Text from Image</button>
+      <button id="runOcrBtn" type="button">Run OCR Text</button>
+    </div>
+
+    <div class="field">
+      <label for="ocrText">OCR text</label>
+      <textarea id="ocrText" placeholder="Extracted image text will appear here."></textarea>
+    </div>
+
     <div id="status" aria-live="polite">Upload a file to begin.</div>
 
     <div class="table-wrap">
@@ -255,13 +280,18 @@
     </div>
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script>
     const systemPromptEl = document.getElementById("systemPrompt");
     const promptFileEl = document.getElementById("promptFile");
+    const imageFileEl = document.getElementById("imageFile");
+    const ocrTextEl = document.getElementById("ocrText");
     const apiUrlEl = document.getElementById("apiUrl");
     const apiKeyEl = document.getElementById("apiKey");
     const modelNameEl = document.getElementById("modelName");
     const runBtn = document.getElementById("runBtn");
+    const extractOcrBtn = document.getElementById("extractOcrBtn");
+    const runOcrBtn = document.getElementById("runOcrBtn");
     const downloadBtn = document.getElementById("downloadBtn");
     const statusEl = document.getElementById("status");
     const resultsBody = document.getElementById("resultsBody");
@@ -301,6 +331,18 @@
 
       tr.append(rowCell, inputCell, responseCell);
       resultsBody.appendChild(tr);
+    }
+
+    function appendResult(input, response) {
+      const result = {
+        rowNumber: results.length + 1,
+        input,
+        response
+      };
+
+      results.push(result);
+      addResultRow(result.rowNumber, result.input, result.response);
+      downloadBtn.style.display = "inline-block";
     }
 
     async function callModel(apiUrl, apiKey, systemPrompt, userPrompt, modelName) {
@@ -444,7 +486,81 @@
       }
     }
 
+    async function extractOcrText() {
+      const file = imageFileEl.files[0];
+
+      if (!file) {
+        setStatus("Choose an image file first.", true);
+        return;
+      }
+
+      if (!window.Tesseract) {
+        setStatus("Tesseract.js did not load. Check your internet connection and try again.", true);
+        return;
+      }
+
+      extractOcrBtn.disabled = true;
+      runOcrBtn.disabled = true;
+
+      try {
+        setStatus("Loading OCR engine...");
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        setStatus("Extracting text from image...");
+
+        const result = await Tesseract.recognize(file, "chi_tra+eng");
+        ocrTextEl.value = result?.data?.text?.trim() || "";
+        setStatus("OCR complete");
+      } catch (error) {
+        setStatus(error.message || String(error), true);
+      } finally {
+        extractOcrBtn.disabled = false;
+        runOcrBtn.disabled = false;
+      }
+    }
+
+    async function runOcrText() {
+      const apiUrl = apiUrlEl.value.trim();
+      const apiKey = apiKeyEl.value.trim();
+      const modelName = modelNameEl.value.trim();
+      const systemPrompt = systemPromptEl.value;
+      const ocrText = ocrTextEl.value.trim();
+
+      if (!ocrText) {
+        setStatus("Extract or enter OCR text first.", true);
+        return;
+      }
+
+      if (!apiUrl) {
+        setStatus("Enter an API URL first.", true);
+        return;
+      }
+
+      if (!modelName) {
+        setStatus("Enter a model name first.", true);
+        return;
+      }
+
+      runOcrBtn.disabled = true;
+      extractOcrBtn.disabled = true;
+
+      try {
+        setStatus("Sending OCR text to model...");
+        const modelResponse = await callModel(apiUrl, apiKey, systemPrompt, ocrText, modelName);
+        appendResult(ocrText, modelResponse);
+        setStatus("OCR text processed");
+      } catch (error) {
+        const modelResponse = `Error: ${error.message || String(error)}`;
+        appendResult(ocrText, modelResponse);
+        setStatus("OCR text processed with an error", true);
+      } finally {
+        runOcrBtn.disabled = false;
+        extractOcrBtn.disabled = false;
+      }
+    }
+
     runBtn.addEventListener("click", runBatch);
+    extractOcrBtn.addEventListener("click", extractOcrText);
+    runOcrBtn.addEventListener("click", runOcrText);
     downloadBtn.addEventListener("click", downloadCsv);
   </script>
 </body>
