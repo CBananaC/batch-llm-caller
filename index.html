@@ -74,6 +74,7 @@
     textarea,
     input[type="text"],
     input[type="password"],
+    select,
     input[type="file"] {
       width: 100%;
       font: inherit;
@@ -81,7 +82,8 @@
 
     textarea,
     input[type="text"],
-    input[type="password"] {
+    input[type="password"],
+    select {
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 11px 12px;
@@ -96,6 +98,44 @@
 
     input[type="file"] {
       padding: 10px 0;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .notice,
+    .warning {
+      margin: 12px 0 18px;
+      padding: 13px 14px;
+      border-radius: 8px;
+      font-size: 0.94rem;
+    }
+
+    .notice {
+      border: 1px solid #c7d2fe;
+      background: #eef2ff;
+      color: #263a83;
+    }
+
+    .warning {
+      border: 1px solid #f9d28b;
+      background: #fff7e6;
+      color: #744210;
+    }
+
+    .notice ol {
+      margin: 8px 0 0 20px;
+      padding: 0;
+    }
+
+    .notice li {
+      margin: 4px 0;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 0.92em;
     }
 
     .actions {
@@ -220,6 +260,16 @@
     </div>
 
     <div class="field">
+      <label for="backendPreset">Backend preset</label>
+      <select id="backendPreset">
+        <option value="lmstudio">LM Studio Local</option>
+        <option value="openrouter">OpenRouter</option>
+        <option value="vertex">Google Cloud Vertex AI Gemini</option>
+        <option value="custom">Custom</option>
+      </select>
+    </div>
+
+    <div class="field">
       <label for="apiUrl">API URL</label>
       <input id="apiUrl" type="text" value="http://127.0.0.1:1234/v1/chat/completions">
     </div>
@@ -227,6 +277,9 @@
     <div class="field">
       <label for="apiKey">API Key</label>
       <input id="apiKey" type="password" value="">
+      <p id="apiKeyHelp" class="help-text hidden">
+        For Vertex AI, paste a temporary Google Cloud access token from: <code>gcloud auth print-access-token</code>
+      </p>
     </div>
 
     <div class="field">
@@ -235,11 +288,45 @@
         id="modelName"
         type="text"
         value="qwen3.5-0.8b-mlx:3"
-        placeholder="qwen3.5-0.8b-mlx:3, gemini-2.5-flash, meta-llama/llama-3.3-70b-instruct:free"
+        placeholder="qwen3.5-0.8b-mlx:3, google/gemini-2.5-flash, meta-llama/llama-3.3-70b-instruct:free"
       >
       <p class="help-text">
-        Examples: qwen3.5-0.8b-mlx:3 for LM Studio; gemini-2.5-flash for Google AI Studio; meta-llama/llama-3.3-70b-instruct:free for OpenRouter.
+        Examples: qwen3.5-0.8b-mlx:3 for LM Studio; google/gemini-2.5-flash for Vertex AI; meta-llama/llama-3.3-70b-instruct:free for OpenRouter.
       </p>
+    </div>
+
+    <div id="vertexSettings" class="hidden">
+      <div class="warning">
+        Vertex AI uses Google Cloud OAuth access tokens, not normal Gemini API keys. Run <code>gcloud auth print-access-token</code> and paste the result into API Key. The token expires, so this is for testing only.
+      </div>
+
+      <div class="field">
+        <label for="vertexProjectId">Google Cloud Project ID</label>
+        <input id="vertexProjectId" type="text" value="delta-entry-496910-e7">
+      </div>
+
+      <div class="field">
+        <label for="vertexLocation">Location</label>
+        <input id="vertexLocation" type="text" value="global">
+        <p class="help-text">Try global first. If it fails, try us-central1.</p>
+      </div>
+
+      <div class="actions">
+        <button id="buildVertexUrlBtn" type="button">Build Vertex AI URL</button>
+      </div>
+
+      <div class="notice">
+        <strong>Vertex AI testing</strong>
+        <ol>
+          <li>In Terminal, run: <code>gcloud config get-value project</code></li>
+          <li>If needed, set the project: <code>gcloud config set project delta-entry-496910-e7</code></li>
+          <li>Enable Vertex AI: <code>gcloud services enable aiplatform.googleapis.com</code></li>
+          <li>Get a temporary token: <code>gcloud auth print-access-token</code></li>
+          <li>Paste the token into the API Key field.</li>
+          <li>Use API URL built by the Build Vertex AI URL button and model <code>google/gemini-2.5-flash</code>.</li>
+          <li>If global fails, try location: <code>us-central1</code></li>
+        </ol>
+      </div>
     </div>
 
     <div class="actions">
@@ -286,9 +373,15 @@
     const promptFileEl = document.getElementById("promptFile");
     const imageFileEl = document.getElementById("imageFile");
     const ocrTextEl = document.getElementById("ocrText");
+    const backendPresetEl = document.getElementById("backendPreset");
     const apiUrlEl = document.getElementById("apiUrl");
     const apiKeyEl = document.getElementById("apiKey");
+    const apiKeyHelpEl = document.getElementById("apiKeyHelp");
     const modelNameEl = document.getElementById("modelName");
+    const vertexSettingsEl = document.getElementById("vertexSettings");
+    const vertexProjectIdEl = document.getElementById("vertexProjectId");
+    const vertexLocationEl = document.getElementById("vertexLocation");
+    const buildVertexUrlBtn = document.getElementById("buildVertexUrlBtn");
     const runBtn = document.getElementById("runBtn");
     const extractOcrBtn = document.getElementById("extractOcrBtn");
     const runOcrBtn = document.getElementById("runOcrBtn");
@@ -297,6 +390,21 @@
     const resultsBody = document.getElementById("resultsBody");
 
     let results = [];
+
+    const backendPresets = {
+      lmstudio: {
+        apiUrl: "http://127.0.0.1:1234/v1/chat/completions",
+        model: "qwen3.5-0.8b-mlx:3"
+      },
+      openrouter: {
+        apiUrl: "https://openrouter.ai/api/v1/chat/completions",
+        model: "meta-llama/llama-3.3-70b-instruct:free"
+      },
+      vertex: {
+        apiUrl: "",
+        model: "google/gemini-2.5-flash"
+      }
+    };
 
     function setStatus(message, isError = false) {
       statusEl.textContent = message;
@@ -345,6 +453,61 @@
       downloadBtn.style.display = "inline-block";
     }
 
+    function buildVertexUrl() {
+      const projectId = vertexProjectIdEl.value.trim();
+      const location = vertexLocationEl.value.trim();
+
+      if (!projectId || !location) {
+        setStatus("Enter a Vertex AI project ID and location first.", true);
+        return;
+      }
+
+      apiUrlEl.value = `https://aiplatform.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/locations/${encodeURIComponent(location)}/endpoints/openapi/chat/completions`;
+      setStatus("Vertex AI URL built.");
+    }
+
+    function updateVertexVisibility(isVertex) {
+      vertexSettingsEl.classList.toggle("hidden", !isVertex);
+      apiKeyHelpEl.classList.toggle("hidden", !isVertex);
+    }
+
+    function applyBackendPreset() {
+      const preset = backendPresetEl.value;
+      updateVertexVisibility(preset === "vertex");
+
+      if (preset === "custom") {
+        return;
+      }
+
+      const settings = backendPresets[preset];
+      apiKeyEl.value = "";
+      modelNameEl.value = settings.model;
+
+      if (preset === "vertex") {
+        buildVertexUrl();
+        return;
+      }
+
+      apiUrlEl.value = settings.apiUrl;
+      setStatus(`${backendPresetEl.options[backendPresetEl.selectedIndex].text} preset applied.`);
+    }
+
+    function getHttpErrorMessage(status, fallbackMessage) {
+      if (status === 401 || status === 403) {
+        return "Authentication failed. For Vertex AI, refresh your access token with gcloud auth print-access-token.";
+      }
+
+      if (status === 404) {
+        return "Endpoint or model not found. Check project ID, location, API URL, and model name.";
+      }
+
+      if (status === 429) {
+        return "Rate limit or quota reached. Check your Vertex AI quota or try another region.";
+      }
+
+      return fallbackMessage;
+    }
+
     async function callModel(apiUrl, apiKey, systemPrompt, userPrompt, modelName) {
       const headers = {
         "Content-Type": "application/json"
@@ -354,18 +517,24 @@
         headers.Authorization = `Bearer ${apiKey}`;
       }
 
-      const response = await fetch(apiUrl, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          model: modelName,
-          temperature: 0,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt }
-          ]
-        })
-      });
+      let response;
+
+      try {
+        response = await fetch(apiUrl, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            model: modelName,
+            temperature: 0,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt }
+            ]
+          })
+        });
+      } catch (error) {
+        throw new Error("Network or CORS error. If using Vertex AI from the browser, the browser may block the request. For production, use a Cloud Run backend proxy.");
+      }
 
       const text = await response.text();
       let data = null;
@@ -373,12 +542,13 @@
       try {
         data = text ? JSON.parse(text) : null;
       } catch (error) {
-        throw new Error(`HTTP ${response.status}: ${text || "Invalid JSON response"}`);
+        const message = getHttpErrorMessage(response.status, text || "Invalid JSON response");
+        throw new Error(`HTTP ${response.status}: ${message}`);
       }
 
       if (!response.ok) {
         const message = data?.error?.message || data?.message || text || response.statusText;
-        throw new Error(`HTTP ${response.status}: ${message}`);
+        throw new Error(`HTTP ${response.status}: ${getHttpErrorMessage(response.status, message)}`);
       }
 
       return data?.choices?.[0]?.message?.content ?? "";
@@ -559,6 +729,8 @@
     }
 
     runBtn.addEventListener("click", runBatch);
+    backendPresetEl.addEventListener("change", applyBackendPreset);
+    buildVertexUrlBtn.addEventListener("click", buildVertexUrl);
     extractOcrBtn.addEventListener("click", extractOcrText);
     runOcrBtn.addEventListener("click", runOcrText);
     downloadBtn.addEventListener("click", downloadCsv);
