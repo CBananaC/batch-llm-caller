@@ -146,6 +146,43 @@
       margin: 24px 0 18px;
     }
 
+    .pipeline-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0 18px;
+    }
+
+    .pipeline-grid .field-wide {
+      grid-column: 1 / -1;
+    }
+
+    .pipeline-actions button {
+      background: #475569;
+    }
+
+    .pipeline-actions button:hover:not(:disabled) {
+      background: #334155;
+    }
+
+    #buildPipelineBtn {
+      background: #7c3aed;
+    }
+
+    #buildPipelineBtn:hover:not(:disabled) {
+      background: #6d28d9;
+    }
+
+    #pipelineStatus {
+      min-height: 28px;
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-weight: 650;
+    }
+
+    #pipelineStatus.error {
+      color: var(--danger);
+    }
+
     button {
       border: 0;
       border-radius: 6px;
@@ -241,6 +278,14 @@
 
       button {
         width: 100%;
+      }
+
+      .pipeline-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .pipeline-grid .field-wide {
+        grid-column: auto;
       }
     }
   </style>
@@ -365,6 +410,86 @@
         <tbody id="resultsBody"></tbody>
       </table>
     </div>
+
+    <h2>Research Pipeline</h2>
+
+    <p class="help-text">
+      Convert current batch results, or a previously downloaded batch CSV, into reusable research artifacts. Generated files still require human review.
+    </p>
+
+    <div class="notice">
+      <strong>Pipeline rules</strong>
+      <ol>
+        <li>Entity cleaning removes Markdown code fences and separates invalid JSON into an error CSV.</li>
+        <li>TEI export requires checked source text and marks entities found in that text.</li>
+        <li>Gazetteer export leaves normalization, identifiers, and coordinates blank for authoritative lookup.</li>
+        <li>Network export requires reviewed relationship JSON with evidence; co-occurrence alone never creates an edge.</li>
+      </ol>
+    </div>
+
+    <div class="pipeline-grid">
+      <div class="field field-wide">
+        <label for="pipelineCsvFile">Optional batch-results CSV</label>
+        <input id="pipelineCsvFile" type="file" accept=".csv,text/csv">
+        <p class="help-text">Choose a file, paste CSV below, or leave both empty to use the current results table.</p>
+      </div>
+
+      <div class="field field-wide">
+        <label for="pipelineCsvText">Or paste batch-results CSV</label>
+        <textarea
+          id="pipelineCsvText"
+          placeholder="row number,original input,model response"
+        ></textarea>
+      </div>
+
+      <div class="field">
+        <label for="pipelineSourceId">Source ID</label>
+        <input id="pipelineSourceId" type="text" value="source-001">
+      </div>
+
+      <div class="field">
+        <label for="pipelineAuthor">Author</label>
+        <input id="pipelineAuthor" type="text" placeholder="Leave blank if unknown">
+      </div>
+
+      <div class="field field-wide">
+        <label for="pipelineTitle">Source title</label>
+        <input id="pipelineTitle" type="text" placeholder="Leave blank if unknown">
+      </div>
+
+      <div class="field field-wide">
+        <label for="pipelineSourceText">Cleaned source text for TEI</label>
+        <textarea id="pipelineSourceText" placeholder="Paste checked source text here."></textarea>
+      </div>
+
+      <div class="field field-wide">
+        <label for="pipelineRelationships">Optional reviewed relationship JSON for network export</label>
+        <textarea
+          id="pipelineRelationships"
+          placeholder='[{"source_node":"章太炎","source_type":"person","target_node":"孫中山","target_type":"person","relationship":"revolutionary_association","evidence":"章太炎與孫中山因反滿革命而結合","uncertain":false,"notes":""}]'
+        ></textarea>
+        <p class="help-text">
+          Network edges are never inferred from co-occurrence. Provide an evidence-backed JSON array to generate node and edge CSVs.
+        </p>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="buildPipelineBtn" type="button">Build Research Artifacts</button>
+    </div>
+
+    <div id="pipelineStatus" aria-live="polite">
+      Run a batch or choose a batch-results CSV.
+    </div>
+
+    <div class="actions pipeline-actions">
+      <button id="downloadCleanedEntitiesBtn" type="button" disabled>Download Cleaned Entities</button>
+      <button id="downloadEntityErrorsBtn" type="button" disabled>Download Entity Errors</button>
+      <button id="downloadTeiBtn" type="button" disabled>Download TEI XML</button>
+      <button id="downloadGazetteerBtn" type="button" disabled>Download Gazetteer CSV</button>
+      <button id="downloadNetworkNodesBtn" type="button" disabled>Download Network Nodes</button>
+      <button id="downloadNetworkEdgesBtn" type="button" disabled>Download Network Edges</button>
+    </div>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
@@ -388,8 +513,24 @@
     const downloadBtn = document.getElementById("downloadBtn");
     const statusEl = document.getElementById("status");
     const resultsBody = document.getElementById("resultsBody");
+    const pipelineCsvFileEl = document.getElementById("pipelineCsvFile");
+    const pipelineCsvTextEl = document.getElementById("pipelineCsvText");
+    const pipelineSourceIdEl = document.getElementById("pipelineSourceId");
+    const pipelineAuthorEl = document.getElementById("pipelineAuthor");
+    const pipelineTitleEl = document.getElementById("pipelineTitle");
+    const pipelineSourceTextEl = document.getElementById("pipelineSourceText");
+    const pipelineRelationshipsEl = document.getElementById("pipelineRelationships");
+    const buildPipelineBtn = document.getElementById("buildPipelineBtn");
+    const pipelineStatusEl = document.getElementById("pipelineStatus");
+    const downloadCleanedEntitiesBtn = document.getElementById("downloadCleanedEntitiesBtn");
+    const downloadEntityErrorsBtn = document.getElementById("downloadEntityErrorsBtn");
+    const downloadTeiBtn = document.getElementById("downloadTeiBtn");
+    const downloadGazetteerBtn = document.getElementById("downloadGazetteerBtn");
+    const downloadNetworkNodesBtn = document.getElementById("downloadNetworkNodesBtn");
+    const downloadNetworkEdgesBtn = document.getElementById("downloadNetworkEdgesBtn");
 
     let results = [];
+    let pipelineArtifacts = null;
 
     const backendPresets = {
       lmstudio: {
@@ -409,6 +550,11 @@
     function setStatus(message, isError = false) {
       statusEl.textContent = message;
       statusEl.classList.toggle("error", isError);
+    }
+
+    function setPipelineStatus(message, isError = false) {
+      pipelineStatusEl.textContent = message;
+      pipelineStatusEl.classList.toggle("error", isError);
     }
 
     function readFileAsText(file) {
@@ -591,6 +737,559 @@
       URL.revokeObjectURL(url);
     }
 
+    function normalizeHeader(value) {
+      return String(value || "")
+        .replace(/^\uFEFF/, "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "");
+    }
+
+    function parseCsv(text) {
+      const input = String(text || "").replace(/^\uFEFF/, "");
+      const rows = [];
+      let row = [];
+      let field = "";
+      let insideQuotes = false;
+
+      for (let index = 0; index < input.length; index += 1) {
+        const character = input[index];
+
+        if (insideQuotes) {
+          if (character === '"' && input[index + 1] === '"') {
+            field += '"';
+            index += 1;
+          } else if (character === '"') {
+            insideQuotes = false;
+          } else {
+            field += character;
+          }
+          continue;
+        }
+
+        if (character === '"') {
+          insideQuotes = true;
+        } else if (character === ",") {
+          row.push(field);
+          field = "";
+        } else if (character === "\n" || character === "\r") {
+          if (character === "\r" && input[index + 1] === "\n") {
+            index += 1;
+          }
+          row.push(field);
+          rows.push(row);
+          row = [];
+          field = "";
+        } else {
+          field += character;
+        }
+      }
+
+      if (field || row.length > 0) {
+        row.push(field);
+        rows.push(row);
+      }
+
+      return rows.filter((values) => values.some((value) => value !== ""));
+    }
+
+    function findCsvColumn(headers, possibleNames) {
+      const normalizedHeaders = new Map(
+        headers.map((header, index) => [normalizeHeader(header), index])
+      );
+
+      for (const possibleName of possibleNames) {
+        const index = normalizedHeaders.get(normalizeHeader(possibleName));
+        if (index !== undefined) {
+          return index;
+        }
+      }
+
+      return -1;
+    }
+
+    function parseBatchResultsCsv(text) {
+      const csvRows = parseCsv(text);
+
+      if (csvRows.length < 1) {
+        throw new Error("The batch-results CSV is empty.");
+      }
+
+      const headers = csvRows[0];
+      const rowIndex = findCsvColumn(headers, ["row number", "row", "input row"]);
+      const inputIndex = findCsvColumn(headers, ["original input", "input", "prompt"]);
+      const responseIndex = findCsvColumn(headers, ["model response", "response", "output", "result"]);
+
+      if (inputIndex < 0 || responseIndex < 0) {
+        throw new Error('The CSV must contain "original input" and "model response" columns.');
+      }
+
+      return csvRows.slice(1).map((row, index) => ({
+        rowNumber: rowIndex >= 0 ? row[rowIndex] || index + 1 : index + 1,
+        input: row[inputIndex] || "",
+        response: row[responseIndex] || ""
+      }));
+    }
+
+    function removeMarkdownCodeFences(value) {
+      return String(value || "")
+        .trim()
+        .replace(/^\s*```(?:json)?\s*/i, "")
+        .replace(/\s*```\s*$/, "")
+        .trim();
+    }
+
+    function formatBoolean(value) {
+      if (value === true || String(value).toLowerCase() === "true") {
+        return "true";
+      }
+      if (value === false || String(value).toLowerCase() === "false") {
+        return "false";
+      }
+      return value == null ? "" : String(value);
+    }
+
+    function buildRowsCsv(headers, rows) {
+      return [
+        headers.map(escapeCsvField).join(","),
+        ...rows.map((row) => headers.map((header) => escapeCsvField(row[header])).join(","))
+      ].join("\r\n");
+    }
+
+    function downloadTextFile(filename, content, type, includeBom = false) {
+      const bom = includeBom ? "\uFEFF" : "";
+      const blob = new Blob([bom + content], { type });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function escapeXml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&apos;");
+    }
+
+    function escapeRegExp(value) {
+      return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+
+    function getTeiElementName(entityType) {
+      const elementNames = {
+        personal_name: "persName",
+        place_name: "placeName",
+        official_title: "roleName",
+        date: "date",
+        source_title: "title"
+      };
+      return elementNames[entityType] || "term";
+    }
+
+    function annotateTextForTei(text, entityRows) {
+      const entityTypes = new Map();
+
+      for (const entity of entityRows) {
+        const entityText = String(entity.entity_text || "").trim();
+        if (entityText && !entityTypes.has(entityText)) {
+          entityTypes.set(entityText, entity.entity_type);
+        }
+      }
+
+      const terms = [...entityTypes.keys()].sort((left, right) => right.length - left.length);
+      if (terms.length === 0) {
+        return escapeXml(text);
+      }
+
+      const pattern = new RegExp(terms.map(escapeRegExp).join("|"), "g");
+      let output = "";
+      let lastIndex = 0;
+
+      for (const match of text.matchAll(pattern)) {
+        output += escapeXml(text.slice(lastIndex, match.index));
+        const elementName = getTeiElementName(entityTypes.get(match[0]));
+        output += `<${elementName}>${escapeXml(match[0])}</${elementName}>`;
+        lastIndex = match.index + match[0].length;
+      }
+
+      return output + escapeXml(text.slice(lastIndex));
+    }
+
+    function buildTeiXml(sourceId, title, author, sourceText, entityRows) {
+      const paragraphs = sourceText
+        .split(/\n\s*\n/)
+        .map((paragraph) => paragraph.trim())
+        .filter(Boolean)
+        .map((paragraph) => `        <p>${annotateTextForTei(paragraph, entityRows)}</p>`)
+        .join("\n");
+
+      return [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<TEI xmlns="http://www.tei-c.org/ns/1.0">',
+        "  <teiHeader>",
+        "    <fileDesc>",
+        "      <titleStmt>",
+        `        <title>${escapeXml(title || sourceId)}</title>`,
+        author ? `        <author>${escapeXml(author)}</author>` : "",
+        "      </titleStmt>",
+        "      <publicationStmt>",
+        "        <p>Generated research artifact; publication details require verification.</p>",
+        "      </publicationStmt>",
+        "      <sourceDesc>",
+        `        <p>Source ID: ${escapeXml(sourceId)}</p>`,
+        "      </sourceDesc>",
+        "    </fileDesc>",
+        "    <encodingDesc>",
+        "      <p>Entity markup generated from parsed model output. Human verification is required.</p>",
+        "    </encodingDesc>",
+        "  </teiHeader>",
+        '  <text xml:lang="zh-Hant">',
+        "    <body>",
+        paragraphs || "      <p/>",
+        "    </body>",
+        "  </text>",
+        "</TEI>",
+        ""
+      ].filter((line) => line !== "").join("\n");
+    }
+
+    function parseRelationships(value) {
+      const cleaned = removeMarkdownCodeFences(value);
+      if (!cleaned) {
+        return [];
+      }
+
+      const relationships = JSON.parse(cleaned);
+      if (!Array.isArray(relationships)) {
+        throw new Error("Relationship JSON must be an array.");
+      }
+
+      return relationships.map((relationship, index) => {
+        if (
+          !relationship ||
+          typeof relationship !== "object" ||
+          !relationship.source_node ||
+          !relationship.target_node ||
+          !relationship.relationship ||
+          !relationship.evidence
+        ) {
+          throw new Error(`Relationship item ${index + 1} is missing a node, relationship, or evidence.`);
+        }
+
+        return relationship;
+      });
+    }
+
+    function buildNetworkArtifacts(sourceId, relationships) {
+      const nodes = new Map();
+      const edges = relationships.map((relationship) => {
+        const sourceNode = String(relationship.source_node);
+        const targetNode = String(relationship.target_node);
+        const sourceType = String(relationship.source_type || "entity");
+        const targetType = String(relationship.target_type || "entity");
+
+        if (!nodes.has(sourceNode)) {
+          nodes.set(sourceNode, {
+            node_id: sourceNode,
+            label: sourceNode,
+            node_type: sourceType,
+            uncertain: formatBoolean(relationship.uncertain),
+            notes: ""
+          });
+        }
+
+        if (!nodes.has(targetNode)) {
+          nodes.set(targetNode, {
+            node_id: targetNode,
+            label: targetNode,
+            node_type: targetType,
+            uncertain: formatBoolean(relationship.uncertain),
+            notes: ""
+          });
+        }
+
+        return {
+          source_id: sourceId,
+          source_node: sourceNode,
+          source_type: sourceType,
+          target_node: targetNode,
+          target_type: targetType,
+          relationship: relationship.relationship,
+          evidence: relationship.evidence,
+          uncertain: formatBoolean(relationship.uncertain),
+          notes: relationship.notes || ""
+        };
+      });
+
+      return {
+        nodes: [...nodes.values()],
+        edges
+      };
+    }
+
+    function resetPipelineDownloads() {
+      const buttons = [
+        downloadCleanedEntitiesBtn,
+        downloadEntityErrorsBtn,
+        downloadTeiBtn,
+        downloadGazetteerBtn,
+        downloadNetworkNodesBtn,
+        downloadNetworkEdgesBtn
+      ];
+      buttons.forEach((button) => {
+        button.disabled = true;
+      });
+    }
+
+    async function buildResearchPipeline() {
+      const sourceId = pipelineSourceIdEl.value.trim();
+
+      if (!sourceId) {
+        setPipelineStatus("Enter a source ID first.", true);
+        return;
+      }
+
+      resetPipelineDownloads();
+      buildPipelineBtn.disabled = true;
+
+      try {
+        let inputResults = results;
+        const pastedBatchCsv = pipelineCsvTextEl.value.trim();
+        const batchCsvFile = pipelineCsvFileEl.files[0];
+
+        if (pastedBatchCsv) {
+          inputResults = parseBatchResultsCsv(pastedBatchCsv);
+        } else if (batchCsvFile) {
+          inputResults = parseBatchResultsCsv(await readFileAsText(batchCsvFile));
+        }
+
+        const entityRows = [];
+        const errorRows = [];
+
+        for (const result of inputResults) {
+          const rawResponse = String(result.response || "");
+          const cleanedResponse = removeMarkdownCodeFences(rawResponse);
+          let parsedResponse;
+
+          try {
+            parsedResponse = JSON.parse(cleanedResponse);
+          } catch (error) {
+            errorRows.push({
+              source_id: sourceId,
+              input_row: result.rowNumber,
+              original_input: result.input,
+              raw_response: rawResponse,
+              error: `JSON parsing failed: ${error.message}`
+            });
+            continue;
+          }
+
+          if (!Array.isArray(parsedResponse)) {
+            errorRows.push({
+              source_id: sourceId,
+              input_row: result.rowNumber,
+              original_input: result.input,
+              raw_response: rawResponse,
+              error: "Parsed JSON is not an array."
+            });
+            continue;
+          }
+
+          if (parsedResponse.some((entity) => !entity || typeof entity !== "object" || Array.isArray(entity))) {
+            errorRows.push({
+              source_id: sourceId,
+              input_row: result.rowNumber,
+              original_input: result.input,
+              raw_response: rawResponse,
+              error: "The JSON array contains an item that is not an entity object."
+            });
+            continue;
+          }
+
+          for (const entity of parsedResponse) {
+            entityRows.push({
+              source_id: sourceId,
+              input_row: result.rowNumber,
+              original_input: result.input,
+              entity_text: entity.entity_text || "",
+              entity_type: entity.entity_type || "",
+              uncertain: formatBoolean(entity.uncertain),
+              evidence: entity.evidence || "",
+              notes: entity.notes || ""
+            });
+          }
+        }
+
+        const gazetteerRows = entityRows
+          .filter((entity) => entity.entity_type === "place_name")
+          .map((entity) => ({
+            source_id: sourceId,
+            place_text: entity.entity_text,
+            normalized_place: "",
+            period: "",
+            gazetteer_id: "",
+            latitude: "",
+            longitude: "",
+            uncertain: "true",
+            evidence: entity.evidence,
+            notes: "Authoritative gazetteer lookup required; no coordinates were invented."
+          }));
+
+        const relationships = parseRelationships(pipelineRelationshipsEl.value);
+        const networkArtifacts = buildNetworkArtifacts(sourceId, relationships);
+        const sourceText = pipelineSourceTextEl.value.trim();
+
+        if (inputResults.length === 0 && !sourceText && relationships.length === 0) {
+          throw new Error(
+            "Run a batch, choose or paste a batch-results CSV, add cleaned source text, or provide reviewed relationship JSON."
+          );
+        }
+
+        const tei = sourceText
+          ? buildTeiXml(
+              sourceId,
+              pipelineTitleEl.value.trim(),
+              pipelineAuthorEl.value.trim(),
+              sourceText,
+              entityRows
+            )
+          : "";
+
+        pipelineArtifacts = {
+          sourceId,
+          entityRows,
+          errorRows,
+          tei,
+          gazetteerRows,
+          networkNodes: networkArtifacts.nodes,
+          networkEdges: networkArtifacts.edges
+        };
+
+        downloadCleanedEntitiesBtn.disabled = false;
+        downloadEntityErrorsBtn.disabled = false;
+        downloadTeiBtn.disabled = !tei;
+        downloadGazetteerBtn.disabled = false;
+        downloadNetworkNodesBtn.disabled = networkArtifacts.nodes.length === 0;
+        downloadNetworkEdgesBtn.disabled = networkArtifacts.edges.length === 0;
+
+        const entityMessage = inputResults.length
+          ? `Built ${entityRows.length} entity rows and ${errorRows.length} error rows.`
+          : "No batch results supplied.";
+        const networkMessage = relationships.length
+          ? ` ${relationships.length} network edges prepared.`
+          : " Add reviewed relationship JSON to enable network exports.";
+        setPipelineStatus(`${entityMessage}${networkMessage}`);
+      } catch (error) {
+        pipelineArtifacts = null;
+        setPipelineStatus(error.message || String(error), true);
+      } finally {
+        buildPipelineBtn.disabled = false;
+      }
+    }
+
+    function safeSourceFilename() {
+      return (pipelineArtifacts?.sourceId || "source")
+        .replace(/[^a-zA-Z0-9_-]+/g, "-")
+        .replace(/^-+|-+$/g, "") || "source";
+    }
+
+    function downloadCleanedEntities() {
+      const headers = [
+        "source_id",
+        "input_row",
+        "original_input",
+        "entity_text",
+        "entity_type",
+        "uncertain",
+        "evidence",
+        "notes"
+      ];
+      downloadTextFile(
+        `${safeSourceFilename()}.entities.cleaned.csv`,
+        buildRowsCsv(headers, pipelineArtifacts.entityRows),
+        "text/csv;charset=utf-8",
+        true
+      );
+    }
+
+    function downloadEntityErrors() {
+      const headers = ["source_id", "input_row", "original_input", "raw_response", "error"];
+      downloadTextFile(
+        `${safeSourceFilename()}.entities.errors.csv`,
+        buildRowsCsv(headers, pipelineArtifacts.errorRows),
+        "text/csv;charset=utf-8",
+        true
+      );
+    }
+
+    function downloadTei() {
+      downloadTextFile(
+        `${safeSourceFilename()}.tei.xml`,
+        pipelineArtifacts.tei,
+        "application/xml;charset=utf-8"
+      );
+    }
+
+    function downloadGazetteer() {
+      const headers = [
+        "source_id",
+        "place_text",
+        "normalized_place",
+        "period",
+        "gazetteer_id",
+        "latitude",
+        "longitude",
+        "uncertain",
+        "evidence",
+        "notes"
+      ];
+      downloadTextFile(
+        `${safeSourceFilename()}.gazetteer.csv`,
+        buildRowsCsv(headers, pipelineArtifacts.gazetteerRows),
+        "text/csv;charset=utf-8",
+        true
+      );
+    }
+
+    function downloadNetworkNodes() {
+      const headers = ["node_id", "label", "node_type", "uncertain", "notes"];
+      downloadTextFile(
+        `${safeSourceFilename()}.network-nodes.csv`,
+        buildRowsCsv(headers, pipelineArtifacts.networkNodes),
+        "text/csv;charset=utf-8",
+        true
+      );
+    }
+
+    function downloadNetworkEdges() {
+      const headers = [
+        "source_id",
+        "source_node",
+        "source_type",
+        "target_node",
+        "target_type",
+        "relationship",
+        "evidence",
+        "uncertain",
+        "notes"
+      ];
+      downloadTextFile(
+        `${safeSourceFilename()}.network-edges.csv`,
+        buildRowsCsv(headers, pipelineArtifacts.networkEdges),
+        "text/csv;charset=utf-8",
+        true
+      );
+    }
+
     async function runBatch() {
       const file = promptFileEl.files[0];
       const apiUrl = apiUrlEl.value.trim();
@@ -736,6 +1435,13 @@
     extractOcrBtn.addEventListener("click", extractOcrText);
     runOcrBtn.addEventListener("click", runOcrText);
     downloadBtn.addEventListener("click", downloadCsv);
+    buildPipelineBtn.addEventListener("click", buildResearchPipeline);
+    downloadCleanedEntitiesBtn.addEventListener("click", downloadCleanedEntities);
+    downloadEntityErrorsBtn.addEventListener("click", downloadEntityErrors);
+    downloadTeiBtn.addEventListener("click", downloadTei);
+    downloadGazetteerBtn.addEventListener("click", downloadGazetteer);
+    downloadNetworkNodesBtn.addEventListener("click", downloadNetworkNodes);
+    downloadNetworkEdgesBtn.addEventListener("click", downloadNetworkEdges);
   </script>
 </body>
 </html>
