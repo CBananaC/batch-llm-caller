@@ -577,7 +577,9 @@
 
     function downloadCsv() {
       const csv = buildCsv(results);
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      // The BOM helps Excel and Numbers recognize UTF-8 Chinese text correctly.
+      const bom = "\uFEFF";
+      const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
 
