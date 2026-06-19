@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>LLM Batch Caller</title>
+  <title>Sinitic Text Workbench</title>
   <style>
     :root {
       color-scheme: light;
@@ -15,13 +15,10 @@
       --accent: #2563eb;
       --accent-dark: #1d4ed8;
       --danger: #b42318;
+      --ok: #0f766e;
       --shadow: 0 12px 30px rgba(31, 41, 51, 0.08);
     }
-
-    * {
-      box-sizing: border-box;
-    }
-
+    * { box-sizing: border-box; }
     body {
       margin: 0;
       min-height: 100vh;
@@ -30,531 +27,374 @@
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       line-height: 1.5;
     }
+    .app-header {
+      padding: 18px 28px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+    }
+    .app-header h1 { margin: 0; font-size: 1.4rem; }
+    .app-header p { margin: 4px 0 0; color: var(--muted); font-size: 0.9rem; }
 
-    main {
-      width: min(100% - 32px, 800px);
-      margin: 40px auto;
-      padding: 32px;
+    .layout {
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr);
+      gap: 24px;
+      align-items: start;
+      width: min(100% - 32px, 1180px);
+      margin: 24px auto 60px;
+    }
+    .sidebar {
+      position: sticky; top: 24px;
       background: var(--panel);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 10px;
       box-shadow: var(--shadow);
+      padding: 22px;
     }
-
-    h1 {
-      margin: 0 0 24px;
-      font-size: 2rem;
-      line-height: 1.2;
-    }
-
-    h2 {
-      margin: 28px 0 16px;
-      padding-top: 24px;
-      border-top: 1px solid var(--border);
-      font-size: 1.25rem;
-      line-height: 1.25;
-    }
-
-    .field {
-      margin-bottom: 18px;
-    }
-
-    label {
-      display: block;
-      margin-bottom: 8px;
-      font-weight: 650;
-    }
-
-    .help-text {
-      margin: 7px 0 0;
-      color: var(--muted);
-      font-size: 0.92rem;
-    }
-
-    textarea,
-    input[type="text"],
-    input[type="password"],
-    select,
-    input[type="file"] {
-      width: 100%;
-      font: inherit;
-    }
-
-    textarea,
-    input[type="text"],
-    input[type="password"],
-    select {
+    .panel {
+      background: var(--panel);
       border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 11px 12px;
-      color: var(--text);
-      background: #fff;
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+      padding: 24px;
     }
-
-    textarea {
-      min-height: 130px;
-      resize: vertical;
-    }
-
-    input[type="file"] {
-      padding: 10px 0;
-    }
-
-    .hidden {
-      display: none;
-    }
-
-    .notice,
-    .warning {
-      margin: 12px 0 18px;
-      padding: 13px 14px;
-      border-radius: 8px;
-      font-size: 0.94rem;
-    }
-
-    .notice {
-      border: 1px solid #c7d2fe;
-      background: #eef2ff;
-      color: #263a83;
-    }
-
-    .warning {
-      border: 1px solid #f9d28b;
-      background: #fff7e6;
-      color: #744210;
-    }
-
-    .notice ol {
-      margin: 8px 0 0 20px;
-      padding: 0;
-    }
-
-    .notice li {
-      margin: 4px 0;
-    }
-
-    code {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-      font-size: 0.92em;
-    }
-
-    .actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      align-items: center;
-      margin: 24px 0 18px;
-    }
-
-    .pipeline-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0 18px;
-    }
-
-    .pipeline-grid .field-wide {
-      grid-column: 1 / -1;
-    }
-
-    .pipeline-actions button {
-      background: #475569;
-    }
-
-    .pipeline-actions button:hover:not(:disabled) {
-      background: #334155;
-    }
-
-    #buildPipelineBtn {
-      background: #7c3aed;
-    }
-
-    #buildPipelineBtn:hover:not(:disabled) {
-      background: #6d28d9;
-    }
-
-    #pipelineStatus {
-      min-height: 28px;
-      margin: 0 0 18px;
+    .section-title {
+      margin: 0 0 14px;
+      font-size: 0.76rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
       color: var(--muted);
-      font-weight: 650;
-    }
-
-    #pipelineStatus.error {
-      color: var(--danger);
-    }
-
-    button {
-      border: 0;
-      border-radius: 6px;
-      padding: 10px 16px;
-      font: inherit;
       font-weight: 700;
-      color: #fff;
-      background: var(--accent);
-      cursor: pointer;
     }
-
-    button:hover:not(:disabled) {
-      background: var(--accent-dark);
+    .field { margin-bottom: 16px; }
+    .field:last-child { margin-bottom: 0; }
+    label { display: block; margin-bottom: 7px; font-weight: 650; font-size: 0.93rem; }
+    .help-text { margin: 7px 0 0; color: var(--muted); font-size: 0.86rem; }
+    textarea, input[type="text"], input[type="password"], select, input[type="file"] { width: 100%; font: inherit; }
+    textarea, input[type="text"], input[type="password"], select {
+      border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; color: var(--text); background: #fff;
     }
+    textarea { resize: vertical; }
+    input[type="file"] { padding: 9px 0; }
+    .hidden { display: none !important; }
 
-    button:disabled {
-      cursor: not-allowed;
-      opacity: 0.65;
+    .status-chip {
+      display: inline-flex; align-items: center; gap: 7px;
+      margin-bottom: 18px; padding: 7px 12px; border-radius: 999px;
+      background: #eef2ff; border: 1px solid #c7d2fe; color: #263a83;
+      font-size: 0.84rem; font-weight: 650;
     }
+    .status-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 
-    #downloadBtn {
-      display: none;
-      background: #0f766e;
+    .warning, .notice { margin: 12px 0 0; padding: 11px 12px; border-radius: 8px; font-size: 0.88rem; }
+    .warning { border: 1px solid #f9d28b; background: #fff7e6; color: #744210; }
+    .notice { border: 1px solid #c7d2fe; background: #eef2ff; color: #263a83; }
+    .notice ol { margin: 8px 0 0 18px; padding: 0; }
+    .notice li { margin: 4px 0; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.9em; }
+
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 18px; }
+    button {
+      border: 0; border-radius: 6px; padding: 10px 16px; font: inherit; font-weight: 700;
+      color: #fff; background: var(--accent); cursor: pointer;
     }
+    button:hover:not(:disabled) { background: var(--accent-dark); }
+    button:disabled { cursor: not-allowed; opacity: 0.55; }
+    button.secondary { background: #475569; }
+    button.secondary:hover:not(:disabled) { background: #334155; }
+    button.ok { background: var(--ok); }
+    button.ok:hover:not(:disabled) { background: #115e59; }
 
-    #downloadBtn:hover {
-      background: #115e59;
+    .step-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+    .step-btn {
+      background: #eef2f6; color: var(--text); font-weight: 650; padding: 9px 16px;
     }
+    .step-btn:hover:not(:disabled) { background: #e2e8f0; }
+    .step-btn.active { background: var(--accent); color: #fff; }
+    .step-num { opacity: 0.6; margin-right: 6px; font-variant-numeric: tabular-nums; }
 
-    #status {
-      min-height: 28px;
-      margin: 0 0 18px;
-      color: var(--muted);
-      font-weight: 650;
+    .step-desc { margin: 0 0 18px; color: var(--muted); font-size: 0.92rem; }
+
+    #result { min-height: 160px; }
+    #status { min-height: 24px; margin-top: 16px; color: var(--muted); font-weight: 650; font-size: 0.92rem; }
+    #status.error { color: var(--danger); }
+
+    .subgroup { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border); }
+
+    @media (max-width: 880px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { position: static; }
     }
-
-    #status.error {
-      color: var(--danger);
-    }
-
-    .table-wrap {
-      overflow-x: auto;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: #fff;
-    }
-
-    th,
-    td {
-      padding: 10px 12px;
-      border-bottom: 1px solid var(--border);
-      text-align: left;
-      vertical-align: top;
-    }
-
-    th {
-      background: #eef2f6;
-      font-size: 0.92rem;
-      white-space: nowrap;
-    }
-
-    tr:last-child td {
-      border-bottom: 0;
-    }
-
-    td:first-child {
-      width: 72px;
-      color: var(--muted);
-      font-variant-numeric: tabular-nums;
-    }
-
-    td:nth-child(2),
-    td:nth-child(3) {
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-
     @media (max-width: 560px) {
-      main {
-        width: min(100% - 20px, 800px);
-        margin: 20px auto;
-        padding: 20px;
-      }
-
-      h1 {
-        font-size: 1.65rem;
-      }
-
-      button {
-        width: 100%;
-      }
-
-      .pipeline-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .pipeline-grid .field-wide {
-        grid-column: auto;
-      }
+      .layout { width: min(100% - 20px, 100%); }
+      button { width: 100%; }
+      .step-bar button { width: auto; flex: 1 1 40%; }
     }
   </style>
 </head>
 <body>
-  <main>
-    <h1>LLM Batch Caller</h1>
+  <header class="app-header">
+    <h1>Sinitic Text Workbench</h1>
+    <p>Pick a step, give the AI a source and a prompt, then adopt, edit, or download the result.</p>
+  </header>
 
-    <div class="field">
-      <label for="systemPrompt">System prompt</label>
-      <textarea id="systemPrompt" placeholder="You are a helpful assistant."></textarea>
-    </div>
+  <div class="layout">
+    <!-- ===================== SETTINGS ===================== -->
+    <aside class="sidebar">
+      <p class="section-title">Settings</p>
 
-    <div class="field">
-      <label for="promptFile">Prompt file (.txt or .csv, one prompt per line)</label>
-      <input id="promptFile" type="file" accept=".txt,.csv,text/plain,text/csv">
-    </div>
-
-    <div class="field">
-      <label for="backendPreset">Backend preset</label>
-      <select id="backendPreset">
-        <option value="lmstudio">LM Studio Local</option>
-        <option value="openrouter">OpenRouter</option>
-        <option value="vertex">Google Cloud Vertex AI Gemini</option>
-        <option value="custom">Custom</option>
-      </select>
-    </div>
-
-    <div class="field">
-      <label for="apiUrl">API URL</label>
-      <input id="apiUrl" type="text" value="http://127.0.0.1:1234/v1/chat/completions">
-    </div>
-
-    <div class="field">
-      <label for="apiKey">API Key</label>
-      <input id="apiKey" type="password" value="">
-      <p id="apiKeyHelp" class="help-text hidden">
-        For Vertex AI, paste a temporary Google Cloud access token from: <code>gcloud auth print-access-token</code>
-      </p>
-    </div>
-
-    <div class="field">
-      <label for="modelName">Model name</label>
-      <input
-        id="modelName"
-        type="text"
-        value="qwen3.5-0.8b-mlx:3"
-        placeholder="qwen3.5-0.8b-mlx:3, google/gemini-2.5-flash, meta-llama/llama-3.3-70b-instruct:free"
-      >
-      <p class="help-text">
-        Examples: qwen3.5-0.8b-mlx:3 for LM Studio; google/gemini-2.5-flash for Vertex AI; meta-llama/llama-3.3-70b-instruct:free for OpenRouter.
-      </p>
-    </div>
-
-    <div id="vertexSettings" class="hidden">
-      <div class="warning">
-        Vertex AI uses Google Cloud OAuth access tokens, not normal Gemini API keys. Run <code>gcloud auth print-access-token</code> and paste the result into API Key. The token expires, so this is for testing only.
+      <div id="providerChip" class="status-chip">
+        <span class="dot"></span><span id="providerChipText">OpenAI</span>
       </div>
 
       <div class="field">
-        <label for="vertexProjectId">Google Cloud Project ID</label>
-        <input id="vertexProjectId" type="text" value="delta-entry-496910-e7">
+        <label for="backendPreset">Provider</label>
+        <select id="backendPreset">
+          <option value="openai">OpenAI</option>
+          <option value="gemini">Google Gemini (AI Studio)</option>
+          <option value="vertex">Google Vertex AI</option>
+        </select>
       </div>
 
       <div class="field">
-        <label for="vertexLocation">Location</label>
-        <input id="vertexLocation" type="text" value="global">
-        <p class="help-text">Try global first. If it fails, try us-central1.</p>
+        <label for="apiKey">API Key</label>
+        <input id="apiKey" type="password" value="" autocomplete="off">
+        <p id="apiKeyHelp" class="help-text">Paste your OpenAI API key (starts with sk-).</p>
+      </div>
+
+      <div class="field">
+        <label for="defaultModel">Default model</label>
+        <input id="defaultModel" type="text" value="gpt-4o-mini">
+        <p id="defaultModelHelp" class="help-text">Used unless a step overrides it. e.g. gpt-4o-mini, gpt-4o</p>
+      </div>
+
+      <div class="field">
+        <label for="apiUrl">API URL</label>
+        <input id="apiUrl" type="text" value="https://api.openai.com/v1/chat/completions">
+        <p class="help-text">Auto-filled per provider. Edit only if you know the endpoint.</p>
+      </div>
+
+      <div id="vertexSettings" class="subgroup hidden">
+        <p class="section-title">Vertex AI</p>
+        <div class="warning">
+          Vertex AI uses Google Cloud OAuth access tokens, not normal API keys. Run
+          <code>gcloud auth print-access-token</code> and paste it into API Key. Tokens expire (testing only).
+        </div>
+        <div class="field" style="margin-top:14px;">
+          <label for="vertexProjectId">Google Cloud Project ID</label>
+          <input id="vertexProjectId" type="text" value="delta-entry-496910-e7">
+        </div>
+        <div class="field">
+          <label for="vertexLocation">Location</label>
+          <input id="vertexLocation" type="text" value="global">
+          <p class="help-text">Try global first. If it fails, try us-central1.</p>
+        </div>
+        <div class="actions">
+          <button id="buildVertexUrlBtn" type="button" class="secondary">Build Vertex AI URL</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ===================== WORKING PANEL ===================== -->
+    <main class="panel">
+      <div class="step-bar" id="stepBar"></div>
+
+      <p class="step-desc" id="stepDesc"></p>
+
+      <!-- Source: image (OCR) or text -->
+      <div class="field" id="imageSourceField">
+        <label for="imageFile">Source image (.png, .jpg, .jpeg, .webp)</label>
+        <input id="imageFile" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp">
+        <p class="help-text">Sent to a vision-capable model for transcription. Use a model that accepts images (e.g. gpt-4o, gemini-2.5-flash).</p>
+      </div>
+
+      <div class="field" id="textSourceField">
+        <label for="sourceText">Source text</label>
+        <textarea id="sourceText" rows="7" placeholder="Paste the source text for this step, or load a .txt file below."></textarea>
+        <input id="textFile" type="file" accept=".txt,.xml,.csv,text/plain" style="margin-top:10px;">
+      </div>
+
+      <div class="field">
+        <label for="stepModel">Model for this step</label>
+        <input id="stepModel" type="text" placeholder="Leave blank to use the default model">
+        <p class="help-text">Override the model per task. Blank = default model from Settings.</p>
+      </div>
+
+      <div class="field">
+        <label for="promptText">Prompt</label>
+        <textarea id="promptText" rows="6"></textarea>
+        <div class="actions" style="margin-top:10px;">
+          <button id="savePromptBtn" type="button" class="secondary">Save prompt for this step</button>
+          <button id="resetPromptBtn" type="button" class="secondary">Reset to default</button>
+        </div>
       </div>
 
       <div class="actions">
-        <button id="buildVertexUrlBtn" type="button">Build Vertex AI URL</button>
+        <button id="runBtn" type="button">Run</button>
       </div>
 
-      <div class="notice">
-        <strong>Vertex AI testing</strong>
-        <ol>
-          <li>In Terminal, run: <code>gcloud config get-value project</code></li>
-          <li>If needed, set the project: <code>gcloud config set project delta-entry-496910-e7</code></li>
-          <li>Enable Vertex AI: <code>gcloud services enable aiplatform.googleapis.com</code></li>
-          <li>Get a temporary token: <code>gcloud auth print-access-token</code></li>
-          <li>Paste the token into the API Key field.</li>
-          <li>Use API URL built by the Build Vertex AI URL button and model <code>google/gemini-2.5-flash</code>.</li>
-          <li>If global fails, try location: <code>us-central1</code></li>
-        </ol>
+      <div id="status" aria-live="polite">Choose a step and provide a source.</div>
+
+      <div class="subgroup">
+        <p class="section-title">Result</p>
+        <div class="field">
+          <textarea id="result" placeholder="The AI result appears here. You can edit it before downloading."></textarea>
+        </div>
+        <div class="actions">
+          <button id="downloadBtn" type="button" class="ok" disabled>Download result</button>
+          <button id="sendNextBtn" type="button" class="secondary" disabled>Send result to next step</button>
+        </div>
       </div>
-    </div>
+    </main>
+  </div>
 
-    <div class="actions">
-      <button id="runBtn" type="button">Run</button>
-      <button id="downloadBtn" type="button">Download CSV</button>
-    </div>
-
-    <h2>Image OCR input</h2>
-
-    <div class="field">
-      <label for="imageFile">Image file (.png, .jpg, .jpeg, .webp)</label>
-      <input id="imageFile" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp">
-    </div>
-
-    <div class="actions">
-      <button id="extractOcrBtn" type="button">Extract Text from Image</button>
-      <button id="runOcrBtn" type="button">Run OCR Text</button>
-    </div>
-
-    <div class="field">
-      <label for="ocrText">OCR text</label>
-      <textarea id="ocrText" placeholder="Extracted image text will appear here."></textarea>
-    </div>
-
-    <div id="status" aria-live="polite">Upload a file to begin.</div>
-
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Row</th>
-            <th>Original input</th>
-            <th>Model response</th>
-          </tr>
-        </thead>
-        <tbody id="resultsBody"></tbody>
-      </table>
-    </div>
-
-    <h2>Research Pipeline</h2>
-
-    <p class="help-text">
-      Convert current batch results, or a previously downloaded batch CSV, into reusable research artifacts. Generated files still require human review.
-    </p>
-
-    <div class="notice">
-      <strong>Pipeline rules</strong>
-      <ol>
-        <li>Entity cleaning removes Markdown code fences and separates invalid JSON into an error CSV.</li>
-        <li>TEI export requires checked source text and marks entities found in that text.</li>
-        <li>Gazetteer export leaves normalization, identifiers, and coordinates blank for authoritative lookup.</li>
-        <li>Network export requires reviewed relationship JSON with evidence; co-occurrence alone never creates an edge.</li>
-      </ol>
-    </div>
-
-    <div class="pipeline-grid">
-      <div class="field field-wide">
-        <label for="pipelineCsvFile">Optional batch-results CSV</label>
-        <input id="pipelineCsvFile" type="file" accept=".csv,text/csv">
-        <p class="help-text">Choose a file, paste CSV below, or leave both empty to use the current results table.</p>
-      </div>
-
-      <div class="field field-wide">
-        <label for="pipelineCsvText">Or paste batch-results CSV</label>
-        <textarea
-          id="pipelineCsvText"
-          placeholder="row number,original input,model response"
-        ></textarea>
-      </div>
-
-      <div class="field">
-        <label for="pipelineSourceId">Source ID</label>
-        <input id="pipelineSourceId" type="text" value="source-001">
-      </div>
-
-      <div class="field">
-        <label for="pipelineAuthor">Author</label>
-        <input id="pipelineAuthor" type="text" placeholder="Leave blank if unknown">
-      </div>
-
-      <div class="field field-wide">
-        <label for="pipelineTitle">Source title</label>
-        <input id="pipelineTitle" type="text" placeholder="Leave blank if unknown">
-      </div>
-
-      <div class="field field-wide">
-        <label for="pipelineSourceText">Cleaned source text for TEI</label>
-        <textarea id="pipelineSourceText" placeholder="Paste checked source text here."></textarea>
-      </div>
-
-      <div class="field field-wide">
-        <label for="pipelineRelationships">Optional reviewed relationship JSON for network export</label>
-        <textarea
-          id="pipelineRelationships"
-          placeholder='[{"source_node":"章太炎","source_type":"person","target_node":"孫中山","target_type":"person","relationship":"revolutionary_association","evidence":"章太炎與孫中山因反滿革命而結合","uncertain":false,"notes":""}]'
-        ></textarea>
-        <p class="help-text">
-          Network edges are never inferred from co-occurrence. Provide an evidence-backed JSON array to generate node and edge CSVs.
-        </p>
-      </div>
-    </div>
-
-    <div class="actions">
-      <button id="buildPipelineBtn" type="button">Build Research Artifacts</button>
-    </div>
-
-    <div id="pipelineStatus" aria-live="polite">
-      Run a batch or choose a batch-results CSV.
-    </div>
-
-    <div class="actions pipeline-actions">
-      <button id="downloadCleanedEntitiesBtn" type="button" disabled>Download Cleaned Entities</button>
-      <button id="downloadEntityErrorsBtn" type="button" disabled>Download Entity Errors</button>
-      <button id="downloadTeiBtn" type="button" disabled>Download TEI XML</button>
-      <button id="downloadGazetteerBtn" type="button" disabled>Download Gazetteer CSV</button>
-      <button id="downloadNetworkNodesBtn" type="button" disabled>Download Network Nodes</button>
-      <button id="downloadNetworkEdgesBtn" type="button" disabled>Download Network Edges</button>
-    </div>
-  </main>
-
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script>
-    const systemPromptEl = document.getElementById("systemPrompt");
-    const promptFileEl = document.getElementById("promptFile");
-    const imageFileEl = document.getElementById("imageFile");
-    const ocrTextEl = document.getElementById("ocrText");
-    const backendPresetEl = document.getElementById("backendPreset");
-    const apiUrlEl = document.getElementById("apiUrl");
-    const apiKeyEl = document.getElementById("apiKey");
-    const apiKeyHelpEl = document.getElementById("apiKeyHelp");
-    const modelNameEl = document.getElementById("modelName");
-    const vertexSettingsEl = document.getElementById("vertexSettings");
-    const vertexProjectIdEl = document.getElementById("vertexProjectId");
-    const vertexLocationEl = document.getElementById("vertexLocation");
-    const buildVertexUrlBtn = document.getElementById("buildVertexUrlBtn");
-    const runBtn = document.getElementById("runBtn");
-    const extractOcrBtn = document.getElementById("extractOcrBtn");
-    const runOcrBtn = document.getElementById("runOcrBtn");
-    const downloadBtn = document.getElementById("downloadBtn");
-    const statusEl = document.getElementById("status");
-    const resultsBody = document.getElementById("resultsBody");
-    const pipelineCsvFileEl = document.getElementById("pipelineCsvFile");
-    const pipelineCsvTextEl = document.getElementById("pipelineCsvText");
-    const pipelineSourceIdEl = document.getElementById("pipelineSourceId");
-    const pipelineAuthorEl = document.getElementById("pipelineAuthor");
-    const pipelineTitleEl = document.getElementById("pipelineTitle");
-    const pipelineSourceTextEl = document.getElementById("pipelineSourceText");
-    const pipelineRelationshipsEl = document.getElementById("pipelineRelationships");
-    const buildPipelineBtn = document.getElementById("buildPipelineBtn");
-    const pipelineStatusEl = document.getElementById("pipelineStatus");
-    const downloadCleanedEntitiesBtn = document.getElementById("downloadCleanedEntitiesBtn");
-    const downloadEntityErrorsBtn = document.getElementById("downloadEntityErrorsBtn");
-    const downloadTeiBtn = document.getElementById("downloadTeiBtn");
-    const downloadGazetteerBtn = document.getElementById("downloadGazetteerBtn");
-    const downloadNetworkNodesBtn = document.getElementById("downloadNetworkNodesBtn");
-    const downloadNetworkEdgesBtn = document.getElementById("downloadNetworkEdgesBtn");
-
-    let results = [];
-    let pipelineArtifacts = null;
+    // ---------- Step definitions ----------
+    const STEPS = [
+      {
+        id: "ocr", label: "OCR", input: "image", ext: "raw.txt", mime: "text/plain;charset=utf-8",
+        desc: "Transcribe a source image to text using a vision-capable model.",
+        prompt: "Transcribe all text in this image exactly.\nPreserve the original characters and reading order.\nDo NOT translate, modernise, or correct anything.\nMark any unclear character as 「?」.\nOutput only the transcribed text."
+      },
+      {
+        id: "clean", label: "Clean", input: "text", ext: "cleaned.txt", mime: "text/plain;charset=utf-8",
+        desc: "Correct raw OCR text without altering meaning.",
+        prompt: "Clean this raw OCR text from a Traditional Chinese source.\nRules:\n- Fix obvious misread characters using context.\n- Normalise punctuation to full-width Chinese punctuation.\n- Rejoin lines broken by page layout into proper paragraphs.\n- Remove scan artefacts (stray letters, watermarks).\n- Do NOT translate, modernise, summarise, or invent text.\n- If a character is genuinely uncertain, keep it and add 「?」 after it.\nOutput only the cleaned text.\n\nSource text:\n{{SOURCE}}"
+      },
+      {
+        id: "tei", label: "TEI", input: "text", ext: "tei.xml", mime: "application/xml;charset=utf-8",
+        desc: "Encode cleaned text as TEI XML, marking entities.",
+        prompt: "Encode this cleaned Traditional Chinese text as valid TEI XML.\nRules:\n- Wrap the body in <TEI><text xml:lang=\"zh-Hant\"><body>… with <p> paragraphs.\n- Mark persons as <persName>, places as <placeName>, dates as <date>, official titles as <roleName>.\n- Preserve original wording exactly; do not translate or add facts.\n- Only mark entities you are confident about.\nOutput only the TEI XML, no commentary.\n\nSource text:\n{{SOURCE}}"
+      },
+      {
+        id: "nlp", label: "NLP", input: "text", ext: "nlp.csv", mime: "text/csv;charset=utf-8",
+        desc: "Produce a structured, auditable entity/frequency summary as CSV.",
+        prompt: "Analyse this Traditional Chinese text and output an entity summary as CSV.\nColumns: entity_text,entity_type,count,evidence\n- entity_type is one of: person, place, date, title, term.\n- count is how many times it appears.\n- evidence is a short quoted phrase from the text.\n- Do not invent entities or counts; only use what is present.\nOutput only CSV with a header row.\n\nSource text:\n{{SOURCE}}"
+      },
+      {
+        id: "gis", label: "GIS", input: "text", ext: "gazetteer.csv", mime: "text/csv;charset=utf-8",
+        desc: "Extract place names as a gazetteer table for authoritative lookup.",
+        prompt: "Extract every place name from this Traditional Chinese text as a gazetteer CSV.\nColumns: place_text,normalized_place,period,gazetteer_id,latitude,longitude,uncertain,evidence\n- Leave normalized_place, gazetteer_id, latitude, longitude BLANK (authoritative lookup is done later).\n- NEVER invent coordinates or identifiers.\n- uncertain is true/false.\n- evidence is a short quoted phrase.\nOutput only CSV with a header row.\n\nSource text:\n{{SOURCE}}"
+      },
+      {
+        id: "network", label: "Network", input: "text", ext: "relationships.json", mime: "application/json;charset=utf-8",
+        desc: "Extract evidence-backed relationships as JSON (never from co-occurrence alone).",
+        prompt: "Extract explicit relationships between entities in this Traditional Chinese text.\nOutput a JSON array; each item:\n{\"source_node\":\"\",\"source_type\":\"person|place|text\",\"target_node\":\"\",\"target_type\":\"person|place|text\",\"relationship\":\"\",\"evidence\":\"\",\"uncertain\":false,\"notes\":\"\"}\nRules:\n- Only create an edge when the text states or clearly implies a relationship.\n- NEVER infer a relationship from mere co-occurrence.\n- evidence must be a short quote from the text.\nOutput only the JSON array.\n\nSource text:\n{{SOURCE}}"
+      }
+    ];
 
     const backendPresets = {
-      lmstudio: {
-        apiUrl: "http://127.0.0.1:1234/v1/chat/completions",
-        model: "qwen3.5-0.8b-mlx:3"
-      },
-      openrouter: {
-        apiUrl: "https://openrouter.ai/api/v1/chat/completions",
-        model: "meta-llama/llama-3.3-70b-instruct:free"
-      },
-      vertex: {
-        apiUrl: "",
-        model: "google/gemini-2.5-flash"
-      }
+      openai: { label: "OpenAI", apiUrl: "https://api.openai.com/v1/chat/completions", model: "gpt-4o-mini", keyHelp: "Paste your OpenAI API key (starts with sk-).", modelHelp: "e.g. gpt-4o-mini, gpt-4o" },
+      gemini: { label: "Google Gemini (AI Studio)", apiUrl: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", model: "gemini-2.5-flash", keyHelp: "Paste your Gemini API key from aistudio.google.com (starts with AIza).", modelHelp: "e.g. gemini-2.5-flash, gemini-2.5-pro" },
+      vertex: { label: "Google Vertex AI", apiUrl: "", model: "google/gemini-2.5-flash", keyHelp: "Paste a token from: gcloud auth print-access-token", modelHelp: "e.g. google/gemini-2.5-flash" }
     };
+
+    const $ = (id) => document.getElementById(id);
+    const backendPresetEl = $("backendPreset");
+    const apiKeyEl = $("apiKey");
+    const apiKeyHelpEl = $("apiKeyHelp");
+    const defaultModelEl = $("defaultModel");
+    const defaultModelHelpEl = $("defaultModelHelp");
+    const apiUrlEl = $("apiUrl");
+    const providerChipText = $("providerChipText");
+    const vertexSettingsEl = $("vertexSettings");
+    const vertexProjectIdEl = $("vertexProjectId");
+    const vertexLocationEl = $("vertexLocation");
+    const buildVertexUrlBtn = $("buildVertexUrlBtn");
+    const stepBarEl = $("stepBar");
+    const stepDescEl = $("stepDesc");
+    const imageSourceField = $("imageSourceField");
+    const textSourceField = $("textSourceField");
+    const imageFileEl = $("imageFile");
+    const sourceTextEl = $("sourceText");
+    const textFileEl = $("textFile");
+    const stepModelEl = $("stepModel");
+    const promptTextEl = $("promptText");
+    const savePromptBtn = $("savePromptBtn");
+    const resetPromptBtn = $("resetPromptBtn");
+    const runBtn = $("runBtn");
+    const statusEl = $("status");
+    const resultEl = $("result");
+    const downloadBtn = $("downloadBtn");
+    const sendNextBtn = $("sendNextBtn");
+
+    let currentStepId = STEPS[0].id;
+
+    const LS = {
+      prompt: (id) => `workbench.prompt.${id}`,
+      model: (id) => `workbench.model.${id}`
+    };
+    function lsGet(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
+    function lsSet(key, val) { try { localStorage.setItem(key, val); } catch (e) {} }
+    function lsDel(key) { try { localStorage.removeItem(key); } catch (e) {} }
+
+    function getStep(id) { return STEPS.find((s) => s.id === id); }
 
     function setStatus(message, isError = false) {
       statusEl.textContent = message;
       statusEl.classList.toggle("error", isError);
     }
 
-    function setPipelineStatus(message, isError = false) {
-      pipelineStatusEl.textContent = message;
-      pipelineStatusEl.classList.toggle("error", isError);
+    function renderStepBar() {
+      stepBarEl.textContent = "";
+      STEPS.forEach((step, index) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "step-btn" + (step.id === currentStepId ? " active" : "");
+        btn.innerHTML = `<span class="step-num">${index + 1}</span>${step.label}`;
+        btn.addEventListener("click", () => selectStep(step.id));
+        stepBarEl.appendChild(btn);
+      });
+    }
+
+    function selectStep(id) {
+      currentStepId = id;
+      const step = getStep(id);
+      renderStepBar();
+      stepDescEl.textContent = step.desc;
+
+      const isImage = step.input === "image";
+      imageSourceField.classList.toggle("hidden", !isImage);
+      textSourceField.classList.toggle("hidden", isImage);
+
+      promptTextEl.value = lsGet(LS.prompt(id)) ?? step.prompt;
+      stepModelEl.value = lsGet(LS.model(id)) ?? "";
+
+      resultEl.value = "";
+      downloadBtn.disabled = true;
+      sendNextBtn.disabled = STEPS.findIndex((s) => s.id === id) >= STEPS.length - 1;
+      sendNextBtn.disabled = true;
+      setStatus(`Step: ${step.label}.`);
+    }
+
+    function buildVertexUrl() {
+      const projectId = vertexProjectIdEl.value.trim();
+      const location = vertexLocationEl.value.trim();
+      if (!projectId || !location) { setStatus("Enter a Vertex AI project ID and location first.", true); return; }
+      apiUrlEl.value = `https://aiplatform.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/locations/${encodeURIComponent(location)}/endpoints/openapi/chat/completions`;
+      setStatus("Vertex AI URL built.");
+    }
+
+    function applyBackendPreset() {
+      const preset = backendPresetEl.value;
+      const settings = backendPresets[preset];
+      const isVertex = preset === "vertex";
+      vertexSettingsEl.classList.toggle("hidden", !isVertex);
+      providerChipText.textContent = settings.label;
+      apiKeyHelpEl.textContent = settings.keyHelp;
+      defaultModelHelpEl.textContent = settings.modelHelp;
+      apiKeyEl.value = "";
+      defaultModelEl.value = settings.model;
+      if (isVertex) { buildVertexUrl(); return; }
+      apiUrlEl.value = settings.apiUrl;
+      setStatus(`${settings.label} preset applied.`);
+    }
+
+    function getHttpErrorMessage(status, fallback) {
+      if (status === 401 || status === 403) return "Authentication failed. Check your API key / Vertex token.";
+      if (status === 404) return "Endpoint or model not found. Check API URL and model name.";
+      if (status === 429) return "Rate limit or quota reached. Wait and retry.";
+      return fallback;
     }
 
     function readFileAsText(file) {
@@ -566,105 +406,19 @@
       });
     }
 
-    function getPromptLines(text) {
-      return text
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0);
+    function readFileAsDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(reader.error || new Error("Could not read file."));
+        reader.readAsDataURL(file);
+      });
     }
 
-    function addResultRow(rowNumber, input, response) {
-      const tr = document.createElement("tr");
-      const rowCell = document.createElement("td");
-      const inputCell = document.createElement("td");
-      const responseCell = document.createElement("td");
-
-      rowCell.textContent = rowNumber;
-      inputCell.textContent = input;
-      responseCell.textContent = response;
-
-      tr.append(rowCell, inputCell, responseCell);
-      resultsBody.appendChild(tr);
-    }
-
-    function appendResult(input, response) {
-      const result = {
-        rowNumber: results.length + 1,
-        input,
-        response
-      };
-
-      results.push(result);
-      addResultRow(result.rowNumber, result.input, result.response);
-      downloadBtn.style.display = "inline-block";
-    }
-
-    function buildVertexUrl() {
-      const projectId = vertexProjectIdEl.value.trim();
-      const location = vertexLocationEl.value.trim();
-
-      if (!projectId || !location) {
-        setStatus("Enter a Vertex AI project ID and location first.", true);
-        return;
-      }
-
-      apiUrlEl.value = `https://aiplatform.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/locations/${encodeURIComponent(location)}/endpoints/openapi/chat/completions`;
-      setStatus("Vertex AI URL built.");
-    }
-
-    function updateVertexVisibility(isVertex) {
-      vertexSettingsEl.classList.toggle("hidden", !isVertex);
-      apiKeyHelpEl.classList.toggle("hidden", !isVertex);
-    }
-
-    function applyBackendPreset() {
-      const preset = backendPresetEl.value;
-      updateVertexVisibility(preset === "vertex");
-
-      if (preset === "custom") {
-        return;
-      }
-
-      const settings = backendPresets[preset];
-      apiKeyEl.value = "";
-      modelNameEl.value = settings.model;
-
-      if (preset === "vertex") {
-        buildVertexUrl();
-        return;
-      }
-
-      apiUrlEl.value = settings.apiUrl;
-      setStatus(`${backendPresetEl.options[backendPresetEl.selectedIndex].text} preset applied.`);
-    }
-
-    function getHttpErrorMessage(status, fallbackMessage) {
-      if (status === 401 || status === 403) {
-        return "Authentication failed. For Vertex AI, refresh your access token with gcloud auth print-access-token.";
-      }
-
-      if (status === 404) {
-        return "Endpoint or model not found. Check project ID, location, API URL, and model name.";
-      }
-
-      if (status === 429) {
-        return "Rate limit or quota reached. Check your Vertex AI quota or try another region.";
-      }
-
-      return fallbackMessage;
-    }
-
-    async function callModel(apiUrl, apiKey, systemPrompt, userPrompt, modelName) {
-      const headers = {
-        "Content-Type": "application/json"
-      };
-
-      if (apiKey) {
-        headers.Authorization = `Bearer ${apiKey}`;
-      }
-
+    async function callModel(apiUrl, apiKey, modelName, userContent) {
+      const headers = { "Content-Type": "application/json" };
+      if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
       let response;
-
       try {
         response = await fetch(apiUrl, {
           method: "POST",
@@ -672,684 +426,68 @@
           body: JSON.stringify({
             model: modelName,
             temperature: 0,
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userPrompt }
-            ]
+            messages: [{ role: "user", content: userContent }]
           })
         });
       } catch (error) {
-        throw new Error("Network or CORS error. If using Vertex AI from the browser, the browser may block the request. For production, use a Cloud Run backend proxy.");
+        throw new Error("Network or CORS error. Some providers block direct browser calls; for production use a backend proxy.");
       }
-
       const text = await response.text();
       let data = null;
-
-      try {
-        data = text ? JSON.parse(text) : null;
-      } catch (error) {
-        const message = getHttpErrorMessage(response.status, text || "Invalid JSON response");
-        throw new Error(`HTTP ${response.status}: ${message}`);
-      }
-
+      try { data = text ? JSON.parse(text) : null; }
+      catch (e) { throw new Error(`HTTP ${response.status}: ${getHttpErrorMessage(response.status, text || "Invalid JSON response")}`); }
       if (!response.ok) {
         const message = data?.error?.message || data?.message || text || response.statusText;
         throw new Error(`HTTP ${response.status}: ${getHttpErrorMessage(response.status, message)}`);
       }
-
       return data?.choices?.[0]?.message?.content ?? "";
     }
 
-    function escapeCsvField(value) {
-      const text = String(value ?? "");
-      if (/[",\n\r]/.test(text)) {
-        return `"${text.replace(/"/g, '""')}"`;
-      }
-      return text;
+    function safeName() {
+      const id = ($("sourceId") && $("sourceId").value) || "source-001";
+      return String(id).replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || "source";
     }
 
-    function buildCsv(rows) {
-      const header = ["row number", "original input", "model response"];
-      const lines = [
-        header.map(escapeCsvField).join(","),
-        ...rows.map((row) => [
-          row.rowNumber,
-          row.input,
-          row.response
-        ].map(escapeCsvField).join(","))
-      ];
-      return lines.join("\r\n");
+    function currentModel() {
+      return (stepModelEl.value.trim() || defaultModelEl.value.trim());
     }
 
-    function downloadCsv() {
-      const csv = buildCsv(results);
-      // The BOM helps Excel and Numbers recognize UTF-8 Chinese text correctly.
-      const bom = "\uFEFF";
-      const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-
-      link.href = url;
-      link.download = "results.csv";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-    }
-
-    function normalizeHeader(value) {
-      return String(value || "")
-        .replace(/^\uFEFF/, "")
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "_")
-        .replace(/^_+|_+$/g, "");
-    }
-
-    function parseCsv(text) {
-      const input = String(text || "").replace(/^\uFEFF/, "");
-      const rows = [];
-      let row = [];
-      let field = "";
-      let insideQuotes = false;
-
-      for (let index = 0; index < input.length; index += 1) {
-        const character = input[index];
-
-        if (insideQuotes) {
-          if (character === '"' && input[index + 1] === '"') {
-            field += '"';
-            index += 1;
-          } else if (character === '"') {
-            insideQuotes = false;
-          } else {
-            field += character;
-          }
-          continue;
-        }
-
-        if (character === '"') {
-          insideQuotes = true;
-        } else if (character === ",") {
-          row.push(field);
-          field = "";
-        } else if (character === "\n" || character === "\r") {
-          if (character === "\r" && input[index + 1] === "\n") {
-            index += 1;
-          }
-          row.push(field);
-          rows.push(row);
-          row = [];
-          field = "";
-        } else {
-          field += character;
-        }
-      }
-
-      if (field || row.length > 0) {
-        row.push(field);
-        rows.push(row);
-      }
-
-      return rows.filter((values) => values.some((value) => value !== ""));
-    }
-
-    function findCsvColumn(headers, possibleNames) {
-      const normalizedHeaders = new Map(
-        headers.map((header, index) => [normalizeHeader(header), index])
-      );
-
-      for (const possibleName of possibleNames) {
-        const index = normalizedHeaders.get(normalizeHeader(possibleName));
-        if (index !== undefined) {
-          return index;
-        }
-      }
-
-      return -1;
-    }
-
-    function parseBatchResultsCsv(text) {
-      const csvRows = parseCsv(text);
-
-      if (csvRows.length < 1) {
-        throw new Error("The batch-results CSV is empty.");
-      }
-
-      const headers = csvRows[0];
-      const rowIndex = findCsvColumn(headers, ["row number", "row", "input row"]);
-      const inputIndex = findCsvColumn(headers, ["original input", "input", "prompt"]);
-      const responseIndex = findCsvColumn(headers, ["model response", "response", "output", "result"]);
-
-      if (inputIndex < 0 || responseIndex < 0) {
-        throw new Error('The CSV must contain "original input" and "model response" columns.');
-      }
-
-      return csvRows.slice(1).map((row, index) => ({
-        rowNumber: rowIndex >= 0 ? row[rowIndex] || index + 1 : index + 1,
-        input: row[inputIndex] || "",
-        response: row[responseIndex] || ""
-      }));
-    }
-
-    function removeMarkdownCodeFences(value) {
-      return String(value || "")
-        .trim()
-        .replace(/^\s*```(?:json)?\s*/i, "")
-        .replace(/\s*```\s*$/, "")
-        .trim();
-    }
-
-    function formatBoolean(value) {
-      if (value === true || String(value).toLowerCase() === "true") {
-        return "true";
-      }
-      if (value === false || String(value).toLowerCase() === "false") {
-        return "false";
-      }
-      return value == null ? "" : String(value);
-    }
-
-    function buildRowsCsv(headers, rows) {
-      return [
-        headers.map(escapeCsvField).join(","),
-        ...rows.map((row) => headers.map((header) => escapeCsvField(row[header])).join(","))
-      ].join("\r\n");
-    }
-
-    function downloadTextFile(filename, content, type, includeBom = false) {
-      const bom = includeBom ? "\uFEFF" : "";
-      const blob = new Blob([bom + content], { type });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-    }
-
-    function escapeXml(value) {
-      return String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&apos;");
-    }
-
-    function escapeRegExp(value) {
-      return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    }
-
-    function getTeiElementName(entityType) {
-      const elementNames = {
-        personal_name: "persName",
-        place_name: "placeName",
-        official_title: "roleName",
-        date: "date",
-        source_title: "title"
-      };
-      return elementNames[entityType] || "term";
-    }
-
-    function annotateTextForTei(text, entityRows) {
-      const entityTypes = new Map();
-
-      for (const entity of entityRows) {
-        const entityText = String(entity.entity_text || "").trim();
-        if (entityText && !entityTypes.has(entityText)) {
-          entityTypes.set(entityText, entity.entity_type);
-        }
-      }
-
-      const terms = [...entityTypes.keys()].sort((left, right) => right.length - left.length);
-      if (terms.length === 0) {
-        return escapeXml(text);
-      }
-
-      const pattern = new RegExp(terms.map(escapeRegExp).join("|"), "g");
-      let output = "";
-      let lastIndex = 0;
-
-      for (const match of text.matchAll(pattern)) {
-        output += escapeXml(text.slice(lastIndex, match.index));
-        const elementName = getTeiElementName(entityTypes.get(match[0]));
-        output += `<${elementName}>${escapeXml(match[0])}</${elementName}>`;
-        lastIndex = match.index + match[0].length;
-      }
-
-      return output + escapeXml(text.slice(lastIndex));
-    }
-
-    function buildTeiXml(sourceId, title, author, sourceText, entityRows) {
-      const paragraphs = sourceText
-        .split(/\n\s*\n/)
-        .map((paragraph) => paragraph.trim())
-        .filter(Boolean)
-        .map((paragraph) => `        <p>${annotateTextForTei(paragraph, entityRows)}</p>`)
-        .join("\n");
-
-      return [
-        '<?xml version="1.0" encoding="UTF-8"?>',
-        '<TEI xmlns="http://www.tei-c.org/ns/1.0">',
-        "  <teiHeader>",
-        "    <fileDesc>",
-        "      <titleStmt>",
-        `        <title>${escapeXml(title || sourceId)}</title>`,
-        author ? `        <author>${escapeXml(author)}</author>` : "",
-        "      </titleStmt>",
-        "      <publicationStmt>",
-        "        <p>Generated research artifact; publication details require verification.</p>",
-        "      </publicationStmt>",
-        "      <sourceDesc>",
-        `        <p>Source ID: ${escapeXml(sourceId)}</p>`,
-        "      </sourceDesc>",
-        "    </fileDesc>",
-        "    <encodingDesc>",
-        "      <p>Entity markup generated from parsed model output. Human verification is required.</p>",
-        "    </encodingDesc>",
-        "  </teiHeader>",
-        '  <text xml:lang="zh-Hant">',
-        "    <body>",
-        paragraphs || "      <p/>",
-        "    </body>",
-        "  </text>",
-        "</TEI>",
-        ""
-      ].filter((line) => line !== "").join("\n");
-    }
-
-    function parseRelationships(value) {
-      const cleaned = removeMarkdownCodeFences(value);
-      if (!cleaned) {
-        return [];
-      }
-
-      const relationships = JSON.parse(cleaned);
-      if (!Array.isArray(relationships)) {
-        throw new Error("Relationship JSON must be an array.");
-      }
-
-      return relationships.map((relationship, index) => {
-        if (
-          !relationship ||
-          typeof relationship !== "object" ||
-          !relationship.source_node ||
-          !relationship.target_node ||
-          !relationship.relationship ||
-          !relationship.evidence
-        ) {
-          throw new Error(`Relationship item ${index + 1} is missing a node, relationship, or evidence.`);
-        }
-
-        return relationship;
-      });
-    }
-
-    function buildNetworkArtifacts(sourceId, relationships) {
-      const nodes = new Map();
-      const edges = relationships.map((relationship) => {
-        const sourceNode = String(relationship.source_node);
-        const targetNode = String(relationship.target_node);
-        const sourceType = String(relationship.source_type || "entity");
-        const targetType = String(relationship.target_type || "entity");
-
-        if (!nodes.has(sourceNode)) {
-          nodes.set(sourceNode, {
-            node_id: sourceNode,
-            label: sourceNode,
-            node_type: sourceType,
-            uncertain: formatBoolean(relationship.uncertain),
-            notes: ""
-          });
-        }
-
-        if (!nodes.has(targetNode)) {
-          nodes.set(targetNode, {
-            node_id: targetNode,
-            label: targetNode,
-            node_type: targetType,
-            uncertain: formatBoolean(relationship.uncertain),
-            notes: ""
-          });
-        }
-
-        return {
-          source_id: sourceId,
-          source_node: sourceNode,
-          source_type: sourceType,
-          target_node: targetNode,
-          target_type: targetType,
-          relationship: relationship.relationship,
-          evidence: relationship.evidence,
-          uncertain: formatBoolean(relationship.uncertain),
-          notes: relationship.notes || ""
-        };
-      });
-
-      return {
-        nodes: [...nodes.values()],
-        edges
-      };
-    }
-
-    function resetPipelineDownloads() {
-      const buttons = [
-        downloadCleanedEntitiesBtn,
-        downloadEntityErrorsBtn,
-        downloadTeiBtn,
-        downloadGazetteerBtn,
-        downloadNetworkNodesBtn,
-        downloadNetworkEdgesBtn
-      ];
-      buttons.forEach((button) => {
-        button.disabled = true;
-      });
-    }
-
-    async function buildResearchPipeline() {
-      const sourceId = pipelineSourceIdEl.value.trim();
-
-      if (!sourceId) {
-        setPipelineStatus("Enter a source ID first.", true);
-        return;
-      }
-
-      resetPipelineDownloads();
-      buildPipelineBtn.disabled = true;
-
-      try {
-        let inputResults = results;
-        const pastedBatchCsv = pipelineCsvTextEl.value.trim();
-        const batchCsvFile = pipelineCsvFileEl.files[0];
-
-        if (pastedBatchCsv) {
-          inputResults = parseBatchResultsCsv(pastedBatchCsv);
-        } else if (batchCsvFile) {
-          inputResults = parseBatchResultsCsv(await readFileAsText(batchCsvFile));
-        }
-
-        const entityRows = [];
-        const errorRows = [];
-
-        for (const result of inputResults) {
-          const rawResponse = String(result.response || "");
-          const cleanedResponse = removeMarkdownCodeFences(rawResponse);
-          let parsedResponse;
-
-          try {
-            parsedResponse = JSON.parse(cleanedResponse);
-          } catch (error) {
-            errorRows.push({
-              source_id: sourceId,
-              input_row: result.rowNumber,
-              original_input: result.input,
-              raw_response: rawResponse,
-              error: `JSON parsing failed: ${error.message}`
-            });
-            continue;
-          }
-
-          if (!Array.isArray(parsedResponse)) {
-            errorRows.push({
-              source_id: sourceId,
-              input_row: result.rowNumber,
-              original_input: result.input,
-              raw_response: rawResponse,
-              error: "Parsed JSON is not an array."
-            });
-            continue;
-          }
-
-          if (parsedResponse.some((entity) => !entity || typeof entity !== "object" || Array.isArray(entity))) {
-            errorRows.push({
-              source_id: sourceId,
-              input_row: result.rowNumber,
-              original_input: result.input,
-              raw_response: rawResponse,
-              error: "The JSON array contains an item that is not an entity object."
-            });
-            continue;
-          }
-
-          for (const entity of parsedResponse) {
-            entityRows.push({
-              source_id: sourceId,
-              input_row: result.rowNumber,
-              original_input: result.input,
-              entity_text: entity.entity_text || "",
-              entity_type: entity.entity_type || "",
-              uncertain: formatBoolean(entity.uncertain),
-              evidence: entity.evidence || "",
-              notes: entity.notes || ""
-            });
-          }
-        }
-
-        const gazetteerRows = entityRows
-          .filter((entity) => entity.entity_type === "place_name")
-          .map((entity) => ({
-            source_id: sourceId,
-            place_text: entity.entity_text,
-            normalized_place: "",
-            period: "",
-            gazetteer_id: "",
-            latitude: "",
-            longitude: "",
-            uncertain: "true",
-            evidence: entity.evidence,
-            notes: "Authoritative gazetteer lookup required; no coordinates were invented."
-          }));
-
-        const relationships = parseRelationships(pipelineRelationshipsEl.value);
-        const networkArtifacts = buildNetworkArtifacts(sourceId, relationships);
-        const sourceText = pipelineSourceTextEl.value.trim();
-
-        if (inputResults.length === 0 && !sourceText && relationships.length === 0) {
-          throw new Error(
-            "Run a batch, choose or paste a batch-results CSV, add cleaned source text, or provide reviewed relationship JSON."
-          );
-        }
-
-        const tei = sourceText
-          ? buildTeiXml(
-              sourceId,
-              pipelineTitleEl.value.trim(),
-              pipelineAuthorEl.value.trim(),
-              sourceText,
-              entityRows
-            )
-          : "";
-
-        pipelineArtifacts = {
-          sourceId,
-          entityRows,
-          errorRows,
-          tei,
-          gazetteerRows,
-          networkNodes: networkArtifacts.nodes,
-          networkEdges: networkArtifacts.edges
-        };
-
-        downloadCleanedEntitiesBtn.disabled = false;
-        downloadEntityErrorsBtn.disabled = false;
-        downloadTeiBtn.disabled = !tei;
-        downloadGazetteerBtn.disabled = false;
-        downloadNetworkNodesBtn.disabled = networkArtifacts.nodes.length === 0;
-        downloadNetworkEdgesBtn.disabled = networkArtifacts.edges.length === 0;
-
-        const entityMessage = inputResults.length
-          ? `Built ${entityRows.length} entity rows and ${errorRows.length} error rows.`
-          : "No batch results supplied.";
-        const networkMessage = relationships.length
-          ? ` ${relationships.length} network edges prepared.`
-          : " Add reviewed relationship JSON to enable network exports.";
-        setPipelineStatus(`${entityMessage}${networkMessage}`);
-      } catch (error) {
-        pipelineArtifacts = null;
-        setPipelineStatus(error.message || String(error), true);
-      } finally {
-        buildPipelineBtn.disabled = false;
-      }
-    }
-
-    function safeSourceFilename() {
-      return (pipelineArtifacts?.sourceId || "source")
-        .replace(/[^a-zA-Z0-9_-]+/g, "-")
-        .replace(/^-+|-+$/g, "") || "source";
-    }
-
-    function downloadCleanedEntities() {
-      const headers = [
-        "source_id",
-        "input_row",
-        "original_input",
-        "entity_text",
-        "entity_type",
-        "uncertain",
-        "evidence",
-        "notes"
-      ];
-      downloadTextFile(
-        `${safeSourceFilename()}.entities.cleaned.csv`,
-        buildRowsCsv(headers, pipelineArtifacts.entityRows),
-        "text/csv;charset=utf-8",
-        true
-      );
-    }
-
-    function downloadEntityErrors() {
-      const headers = ["source_id", "input_row", "original_input", "raw_response", "error"];
-      downloadTextFile(
-        `${safeSourceFilename()}.entities.errors.csv`,
-        buildRowsCsv(headers, pipelineArtifacts.errorRows),
-        "text/csv;charset=utf-8",
-        true
-      );
-    }
-
-    function downloadTei() {
-      downloadTextFile(
-        `${safeSourceFilename()}.tei.xml`,
-        pipelineArtifacts.tei,
-        "application/xml;charset=utf-8"
-      );
-    }
-
-    function downloadGazetteer() {
-      const headers = [
-        "source_id",
-        "place_text",
-        "normalized_place",
-        "period",
-        "gazetteer_id",
-        "latitude",
-        "longitude",
-        "uncertain",
-        "evidence",
-        "notes"
-      ];
-      downloadTextFile(
-        `${safeSourceFilename()}.gazetteer.csv`,
-        buildRowsCsv(headers, pipelineArtifacts.gazetteerRows),
-        "text/csv;charset=utf-8",
-        true
-      );
-    }
-
-    function downloadNetworkNodes() {
-      const headers = ["node_id", "label", "node_type", "uncertain", "notes"];
-      downloadTextFile(
-        `${safeSourceFilename()}.network-nodes.csv`,
-        buildRowsCsv(headers, pipelineArtifacts.networkNodes),
-        "text/csv;charset=utf-8",
-        true
-      );
-    }
-
-    function downloadNetworkEdges() {
-      const headers = [
-        "source_id",
-        "source_node",
-        "source_type",
-        "target_node",
-        "target_type",
-        "relationship",
-        "evidence",
-        "uncertain",
-        "notes"
-      ];
-      downloadTextFile(
-        `${safeSourceFilename()}.network-edges.csv`,
-        buildRowsCsv(headers, pipelineArtifacts.networkEdges),
-        "text/csv;charset=utf-8",
-        true
-      );
-    }
-
-    async function runBatch() {
-      const file = promptFileEl.files[0];
+    async function run() {
+      const step = getStep(currentStepId);
       const apiUrl = apiUrlEl.value.trim();
       const apiKey = apiKeyEl.value.trim();
-      const modelName = modelNameEl.value.trim();
-      const systemPrompt = systemPromptEl.value;
+      const modelName = currentModel();
+      const prompt = promptTextEl.value;
 
-      if (!file) {
-        setStatus("Choose a .txt or .csv file first.", true);
-        return;
-      }
+      if (!apiUrl) { setStatus("Enter an API URL first.", true); return; }
+      if (!modelName) { setStatus("Enter a model name first.", true); return; }
 
-      if (!apiUrl) {
-        setStatus("Enter an API URL first.", true);
-        return;
-      }
-
-      if (!modelName) {
-        setStatus("Enter a model name first.", true);
-        return;
+      let userContent;
+      if (step.input === "image") {
+        const file = imageFileEl.files[0];
+        if (!file) { setStatus("Choose a source image first.", true); return; }
+        const dataUrl = await readFileAsDataUrl(file);
+        userContent = [
+          { type: "text", text: prompt },
+          { type: "image_url", image_url: { url: dataUrl } }
+        ];
+      } else {
+        const source = sourceTextEl.value.trim();
+        if (!source) { setStatus("Paste or load source text first.", true); return; }
+        userContent = prompt.includes("{{SOURCE}}") ? prompt.replace("{{SOURCE}}", source) : `${prompt}\n\n${source}`;
       }
 
       runBtn.disabled = true;
-      downloadBtn.style.display = "none";
-      results = [];
-      resultsBody.textContent = "";
+      downloadBtn.disabled = true;
+      sendNextBtn.disabled = true;
+      setStatus(`Running ${step.label} with ${modelName}...`);
 
       try {
-        const text = await readFileAsText(file);
-        const lines = getPromptLines(text);
-
-        if (lines.length === 0) {
-          setStatus("No non-empty lines found in the uploaded file.", true);
-          return;
-        }
-
-        for (let i = 0; i < lines.length; i += 1) {
-          const input = lines[i];
-          let modelResponse = "";
-
-          setStatus(`Processing ${i + 1} / ${lines.length}`);
-
-          try {
-            modelResponse = await callModel(apiUrl, apiKey, systemPrompt, input, modelName);
-          } catch (error) {
-            modelResponse = `Error: ${error.message || String(error)}`;
-          }
-
-          const result = {
-            rowNumber: i + 1,
-            input,
-            response: modelResponse
-          };
-
-          results.push(result);
-          addResultRow(result.rowNumber, result.input, result.response);
-        }
-
-        setStatus(`Finished processing ${lines.length} / ${lines.length}`);
-        downloadBtn.style.display = "inline-block";
+        const out = await callModel(apiUrl, apiKey, modelName, userContent);
+        resultEl.value = out;
+        downloadBtn.disabled = !out;
+        sendNextBtn.disabled = !out || STEPS.findIndex((s) => s.id === currentStepId) >= STEPS.length - 1;
+        setStatus(`${step.label} complete. Review and edit the result before adopting.`);
       } catch (error) {
         setStatus(error.message || String(error), true);
       } finally {
@@ -1357,91 +495,64 @@
       }
     }
 
-    async function extractOcrText() {
-      const file = imageFileEl.files[0];
+    function downloadResult() {
+      const step = getStep(currentStepId);
+      const content = resultEl.value;
+      const includeBom = step.mime.startsWith("text/csv") || step.mime.startsWith("text/plain");
+      const bom = includeBom ? "﻿" : "";
+      const blob = new Blob([bom + content], { type: step.mime });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `result.${step.ext}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
 
-      if (!file) {
-        setStatus("Choose an image file first.", true);
-        return;
-      }
-
-      if (!window.Tesseract) {
-        setStatus("Tesseract.js did not load. Check your internet connection and try again.", true);
-        return;
-      }
-
-      extractOcrBtn.disabled = true;
-      runOcrBtn.disabled = true;
-
-      try {
-        setStatus("Loading OCR engine...");
-        await new Promise((resolve) => setTimeout(resolve, 0));
-        setStatus("Extracting text from image...");
-
-        const result = await Tesseract.recognize(file, "chi_tra+eng");
-        ocrTextEl.value = result?.data?.text?.trim() || "";
-        setStatus("OCR complete");
-      } catch (error) {
-        setStatus(error.message || String(error), true);
-      } finally {
-        extractOcrBtn.disabled = false;
-        runOcrBtn.disabled = false;
+    function sendToNextStep() {
+      const index = STEPS.findIndex((s) => s.id === currentStepId);
+      const next = STEPS[index + 1];
+      if (!next) return;
+      const output = resultEl.value;
+      selectStep(next.id);
+      if (next.input === "text") {
+        sourceTextEl.value = output;
+        setStatus(`Result sent to ${next.label}. Review the source text, then run.`);
+      } else {
+        setStatus(`Switched to ${next.label}. Provide a source image.`);
       }
     }
 
-    async function runOcrText() {
-      const apiUrl = apiUrlEl.value.trim();
-      const apiKey = apiKeyEl.value.trim();
-      const modelName = modelNameEl.value.trim();
-      const systemPrompt = systemPromptEl.value;
-      const ocrText = ocrTextEl.value.trim();
-
-      if (!ocrText) {
-        setStatus("Extract or enter OCR text first.", true);
-        return;
-      }
-
-      if (!apiUrl) {
-        setStatus("Enter an API URL first.", true);
-        return;
-      }
-
-      if (!modelName) {
-        setStatus("Enter a model name first.", true);
-        return;
-      }
-
-      runOcrBtn.disabled = true;
-      extractOcrBtn.disabled = true;
-
-      try {
-        setStatus("Sending OCR text to model...");
-        const modelResponse = await callModel(apiUrl, apiKey, systemPrompt, ocrText, modelName);
-        appendResult(ocrText, modelResponse);
-        setStatus("OCR text processed");
-      } catch (error) {
-        const modelResponse = `Error: ${error.message || String(error)}`;
-        appendResult(ocrText, modelResponse);
-        setStatus("OCR text processed with an error", true);
-      } finally {
-        runOcrBtn.disabled = false;
-        extractOcrBtn.disabled = false;
-      }
-    }
-
-    runBtn.addEventListener("click", runBatch);
+    // ---------- wiring ----------
     backendPresetEl.addEventListener("change", applyBackendPreset);
     buildVertexUrlBtn.addEventListener("click", buildVertexUrl);
-    extractOcrBtn.addEventListener("click", extractOcrText);
-    runOcrBtn.addEventListener("click", runOcrText);
-    downloadBtn.addEventListener("click", downloadCsv);
-    buildPipelineBtn.addEventListener("click", buildResearchPipeline);
-    downloadCleanedEntitiesBtn.addEventListener("click", downloadCleanedEntities);
-    downloadEntityErrorsBtn.addEventListener("click", downloadEntityErrors);
-    downloadTeiBtn.addEventListener("click", downloadTei);
-    downloadGazetteerBtn.addEventListener("click", downloadGazetteer);
-    downloadNetworkNodesBtn.addEventListener("click", downloadNetworkNodes);
-    downloadNetworkEdgesBtn.addEventListener("click", downloadNetworkEdges);
+    runBtn.addEventListener("click", () => { run().catch((e) => setStatus(e.message || String(e), true)); });
+    downloadBtn.addEventListener("click", downloadResult);
+    sendNextBtn.addEventListener("click", sendToNextStep);
+
+    savePromptBtn.addEventListener("click", () => {
+      lsSet(LS.prompt(currentStepId), promptTextEl.value);
+      lsSet(LS.model(currentStepId), stepModelEl.value.trim());
+      setStatus("Saved prompt and model for this step.");
+    });
+    resetPromptBtn.addEventListener("click", () => {
+      lsDel(LS.prompt(currentStepId));
+      promptTextEl.value = getStep(currentStepId).prompt;
+      setStatus("Prompt reset to default.");
+    });
+
+    textFileEl.addEventListener("change", async () => {
+      const file = textFileEl.files[0];
+      if (!file) return;
+      try { sourceTextEl.value = await readFileAsText(file); setStatus("Loaded text file into source."); }
+      catch (e) { setStatus(e.message || String(e), true); }
+    });
+
+    renderStepBar();
+    selectStep(currentStepId);
+    applyBackendPreset();
   </script>
 </body>
 </html>
